@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/xiaohongshu-geo/evaluation-report.schema.json",
+  "title": "XiaohongshuGEOEvaluationReport",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "target_brand",
+    "release_decision",
+    "deterministic_checks",
+    "findings",
+    "live_test_status",
+    "live_observations",
+    "required_fixes"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "target_brand": {"type": "string", "minLength": 1},
+    "release_decision": {"enum": ["pass", "review_required", "fail"]},
+    "deterministic_checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["check_id", "status", "details", "object_refs"],
+        "properties": {
+          "check_id": {"type": "string", "minLength": 1},
+          "status": {"enum": ["pass", "fail"]},
+          "details": {"type": "string"},
+          "object_refs": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["finding_id", "severity", "dimension", "verdict", "object_refs", "explanation", "evidence_refs", "suggested_fix"],
+        "properties": {
+          "finding_id": {"type": "string", "pattern": "^F-[0-9]{4,}$"},
+          "severity": {"enum": ["blocker", "major", "minor"]},
+          "dimension": {"enum": ["grounding", "scene", "intent", "question_quality", "brand_visibility", "decision_stage", "multi_turn", "coverage", "redundancy", "content_brief", "claim_boundary", "live_response"]},
+          "verdict": {"enum": ["fail", "review"]},
+          "object_refs": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+          "explanation": {"type": "string", "minLength": 1},
+          "evidence_refs": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+          "suggested_fix": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "live_test_status": {"enum": ["not_run", "partial", "complete"]},
+    "live_observations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["product", "model_or_version", "question_ref", "repeat_index", "run_status", "brand_position", "factual_accuracy", "citation_quality", "intent_satisfaction", "trace_ref", "notes"],
+        "properties": {
+          "product": {"type": "string", "minLength": 1},
+          "model_or_version": {"type": ["string", "null"]},
+          "question_ref": {"type": "string", "minLength": 1},
+          "repeat_index": {"type": "integer", "minimum": 1},
+          "run_status": {"enum": ["completed", "failed", "blocked"]},
+          "brand_position": {"enum": ["absent", "mentioned", "compared", "recommended", "not_applicable"]},
+          "factual_accuracy": {"enum": ["pass", "fail", "review", "not_assessed"]},
+          "citation_quality": {"enum": ["pass", "fail", "review", "not_applicable"]},
+          "intent_satisfaction": {"enum": ["pass", "fail", "review", "not_assessed"]},
+          "trace_ref": {"type": ["string", "null"]},
+          "notes": {"type": "string"}
+        }
+      }
+    },
+    "required_fixes": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+  }
+}

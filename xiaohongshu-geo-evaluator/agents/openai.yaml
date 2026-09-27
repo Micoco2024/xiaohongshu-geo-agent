@@ -1,0 +1,4 @@
+interface:
+  display_name: "小红书 GEO 测试 Agent"
+  short_description: "独立验证问题库质量、证据依据和各AI产品真实表现"
+  default_prompt: "使用 $xiaohongshu-geo-evaluator 独立测试 GEO 问题库，输出发布结论和可定位的问题。"

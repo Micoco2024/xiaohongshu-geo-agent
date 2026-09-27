@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/xiaohongshu-geo/evidence-record.schema.json",
+  "title": "XiaohongshuEvidenceRecord",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "evidence_id",
+    "provenance",
+    "source_type",
+    "source_ref",
+    "author_role",
+    "text",
+    "context",
+    "parent_evidence_id",
+    "usage",
+    "status",
+    "exclusion_reason"
+  ],
+  "properties": {
+    "evidence_id": {
+      "type": "string",
+      "pattern": "^EV-[A-F0-9]{12}$"
+    },
+    "provenance": {
+      "enum": ["public_page", "customer_service", "merchant_api", "user_supplied"]
+    },
+    "source_type": {
+      "enum": [
+        "post",
+        "comment",
+        "reply",
+        "official_brand_page",
+        "shop_page",
+        "product_page",
+        "merchant_api_record",
+        "user_document",
+        "customer_service_message",
+        "customer_service_ticket"
+      ]
+    },
+    "source_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "author_role": {
+      "enum": ["user", "creator", "brand", "merchant", "customer_service_agent", "unknown"]
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "context": {
+      "type": "string"
+    },
+    "parent_evidence_id": {
+      "type": ["string", "null"],
+      "pattern": "^EV-[A-F0-9]{12}$"
+    },
+    "usage": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "brand_fact",
+          "scene_signal",
+          "intent_signal",
+          "question_expression",
+          "contradiction"
+        ]
+      }
+    },
+    "status": {
+      "enum": ["usable", "candidate", "excluded"]
+    },
+    "exclusion_reason": {
+      "type": ["string", "null"]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"status": {"const": "excluded"}},
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {"exclusion_reason": {"type": "string", "minLength": 1}}
+      }
+    }
+  ]
+}

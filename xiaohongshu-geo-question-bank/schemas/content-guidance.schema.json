@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/xiaohongshu-insight/content-guidance.schema.json",
+  "title": "XiaohongshuContentGuidance",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "target_brand", "coverage_note", "briefs"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "target_brand": {"type": "string", "minLength": 1},
+    "coverage_note": {"type": "string", "minLength": 1},
+    "briefs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "content_brief_id",
+          "scene_id",
+          "scene",
+          "intent_id",
+          "intent",
+          "user_questions",
+          "question_refs",
+          "content_job",
+          "content_angle",
+          "content_type",
+          "must_answer",
+          "user_language",
+          "proof_requirements",
+          "brand_entry",
+          "brand_entry_conditions",
+          "claim_boundaries",
+          "evidence_refs"
+        ],
+        "properties": {
+          "content_brief_id": {"type": "string", "pattern": "^XHS-CB-[0-9]{3,}$"},
+          "scene_id": {"type": "string", "pattern": "^XHS-SCN-[0-9]{3,}$"},
+          "scene": {"type": "string", "minLength": 1},
+          "intent_id": {"type": "string", "pattern": "^XHS-INT-[0-9]{3,}$"},
+          "intent": {"type": "string", "minLength": 1},
+          "user_questions": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+          "question_refs": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+          "content_job": {"type": "string", "minLength": 1},
+          "content_angle": {"type": "string", "minLength": 1},
+          "content_type": {"enum": ["explainer", "comparison", "how_to", "checklist", "risk_clarification", "usage_guide", "faq", "experience_story"]},
+          "must_answer": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+          "user_language": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+          "proof_requirements": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+          "brand_entry": {"enum": ["direct_fit", "conditional_fit", "education_only", "not_supported"]},
+          "brand_entry_conditions": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+          "claim_boundaries": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+          "evidence_refs": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^EV-[A-F0-9]{12}$"}}
+        }
+      }
+    }
+  }
+}

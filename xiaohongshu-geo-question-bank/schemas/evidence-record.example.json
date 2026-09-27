@@ -1,0 +1,13 @@
+{
+  "evidence_id": "EV-8CDD86913223",
+  "provenance": "public_page",
+  "source_type": "comment",
+  "source_ref": "https://www.xiaohongshu.com/example-note#comment-17",
+  "author_role": "user",
+  "text": "上班通勤会化妆，敏感肌用什么防晒不容易搓泥？",
+  "context": "用户在通勤防晒相关笔记下追问，上一层内容讨论底妆兼容性。",
+  "parent_evidence_id": null,
+  "usage": ["scene_signal", "intent_signal", "question_expression"],
+  "status": "usable",
+  "exclusion_reason": null
+}

@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>小红书 GEO 工作台</title>
+  <style>
+    :root {
+      --bg: #f5f6f8; --surface: #fff; --surface-2: #f9fafb; --ink: #18191c; --muted: #686c76;
+      --line: #e5e7eb; --red: #d92736; --red-soft: #fff1f2; --green: #147d54; --green-soft: #ecf8f2;
+      --amber: #9a5b00; --amber-soft: #fff7df; --blue: #335bd6; --blue-soft: #eef3ff;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--ink); background: var(--bg); line-height: 1.55;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
+    button, input { font: inherit; }
+    button { cursor: pointer; border: 0; border-radius: 10px; padding: 8px 14px; background: var(--red); color: #fff; }
+    button.secondary { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
+    button:disabled { opacity: .5; cursor: default; }
+    .app { display: grid; grid-template-columns: 300px 1fr; min-height: 100vh; }
+    aside { background: var(--surface); border-right: 1px solid var(--line); padding: 20px 16px; overflow-y: auto; }
+    main { padding: 24px 28px; min-width: 0; }
+    h1 { font-size: 17px; margin: 0 0 4px; }
+    h2 { font-size: 20px; margin: 0; }
+    h3 { font-size: 13px; color: var(--muted); font-weight: 600; margin: 22px 0 8px; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .new-row { display: flex; gap: 8px; margin-top: 14px; }
+    .new-row input { flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
+    .snap { display: block; width: 100%; text-align: left; background: none; color: var(--ink); padding: 9px 10px; border-radius: 10px; }
+    .snap:hover { background: var(--surface-2); }
+    .snap.active { background: var(--red-soft); }
+    .snap strong { display: block; font-size: 14px; }
+    .snap span { font-size: 12px; color: var(--muted); }
+    .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; margin-bottom: 16px; }
+    .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+    .metrics { display: flex; gap: 22px; margin-top: 12px; flex-wrap: wrap; }
+    .metrics div strong { font-size: 20px; display: block; }
+    .metrics div span { font-size: 12px; color: var(--muted); }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
+    .tab { background: none; color: var(--muted); border-radius: 0; border-bottom: 2px solid transparent; padding: 8px 12px; }
+    .tab.active { color: var(--ink); border-bottom-color: var(--red); }
+    .panel { display: none; } .panel.active { display: block; }
+    .tag { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 99px; background: var(--surface-2); border: 1px solid var(--line); margin: 2px 4px 2px 0; }
+    .tag.usable, .tag.pass { background: var(--green-soft); color: var(--green); border-color: transparent; }
+    .tag.candidate, .tag.review_required { background: var(--amber-soft); color: var(--amber); border-color: transparent; }
+    .tag.excluded, .tag.fail { background: var(--red-soft); color: var(--red); border-color: transparent; }
+    .ev { border-top: 1px solid var(--line); padding: 12px 0; }
+    .ev:first-child { border-top: 0; }
+    .ev q { display: block; margin: 4px 0; }
+    .ev a { font-size: 12px; color: var(--blue); word-break: break-all; }
+    .q { padding: 10px 0; border-top: 1px solid var(--line); }
+    .q:first-child { border-top: 0; }
+    .turn { padding: 6px 10px; margin: 6px 0; background: var(--surface-2); border-radius: 8px; }
+    .progress { height: 6px; background: var(--line); border-radius: 99px; overflow: hidden; margin-top: 8px; }
+    .progress div { height: 100%; background: var(--red); width: 0; transition: width .3s; }
+    .notice { padding: 10px 14px; border-radius: 10px; background: var(--amber-soft); color: var(--amber); font-size: 13px; margin-bottom: 16px; }
+    .notice.error { background: var(--red-soft); color: var(--red); }
+    .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+    .hidden { display: none !important; }
+    .key-box { margin-top: 14px; }
+    .remember { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+    .model-pick { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+    .model-pick select { flex: 1; min-width: 0; }
+    table.sum { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+    table.sum th, table.sum td { text-align: left; padding: 6px 8px; border-top: 1px solid var(--line); }
+    table.sum th { color: var(--muted); font-weight: 600; }
+    .lrow { border-top: 1px solid var(--line); padding: 10px 0; }
+    .lrow:first-child { border-top: 0; }
+    .lform { display: grid; gap: 8px; margin-top: 10px; padding: 12px; background: var(--surface-2); border-radius: 10px; }
+    .lform textarea { font: inherit; width: 100%; min-height: 90px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; }
+    .lform input { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; }
+    .lgrid { display: flex; flex-wrap: wrap; gap: 10px; }
+    .resp { white-space: pre-wrap; font-size: 13px; background: var(--surface-2); padding: 8px 10px; border-radius: 8px; margin-top: 6px; }
+    button.small { padding: 4px 10px; font-size: 13px; }
+    select { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+    @media (max-width: 760px) { .app { grid-template-columns: 1fr; } aside { border-right: 0; border-bottom: 1px solid var(--line); } main { padding: 16px; } }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <h1>小红书 GEO 工作台</h1>
+    <div class="muted" id="health">正在连接后端…</div>
+    <div class="key-box">
+      <label class="muted" for="keyInput">Claude API Key</label>
+      <div class="new-row" style="margin-top:4px">
+        <input id="keyInput" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…">
+      </div>
+      <label class="muted remember"><input type="checkbox" id="rememberKey"> 在本浏览器记住</label>
+      <div class="muted" id="keyStatus"></div>
+    </div>
+    <label class="model-pick">
+      <span class="muted">模型</span>
+      <select id="modelSelect"></select>
+    </label>
+    <div class="muted" id="modelNote"></div>
+    <div class="new-row">
+      <input id="brandInput" placeholder="品牌名称">
+      <button id="discoverBtn" title="联网搜索，会消耗 token">搜索证据</button>
+    </div>
+    <div class="muted" style="margin-top:6px">新品牌才需要搜索。已有证据的品牌直接从下方选择，不再联网。</div>
+    <h3>证据库</h3>
+    <div id="snapList"></div>
+  </aside>
+
+  <main>
+    <div id="jobBox" class="card hidden">
+      <div id="jobStage">…</div>
+      <div class="progress"><div id="jobBar"></div></div>
+    </div>
+    <div id="errorBox" class="notice error hidden"></div>
+
+    <div id="emptyState" class="empty">在左侧选择一份证据快照，或者输入新品牌开始搜索。</div>
+
+    <div id="workspace" class="hidden">
+      <div class="card">
+        <div class="head">
+          <div>
+            <h2 id="wsBrand"></h2>
+            <div class="muted" id="wsMeta"></div>
+          </div>
+          <div class="actions">
+            <button class="secondary" id="refreshBtn" title="重新联网搜索，会消耗 token">重新搜索</button>
+          </div>
+        </div>
+        <div class="metrics" id="wsMetrics"></div>
+        <div class="muted" id="wsCoverage" style="margin-top:10px"></div>
+      </div>
+
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-panel="evidencePanel">证据</button>
+        <button class="tab" data-panel="bankPanel">问题库</button>
+        <button class="tab" data-panel="checkPanel">质量检查</button>
+        <button class="tab" data-panel="livePanel">AI 实测</button>
+      </div>
+
+      <section class="panel active" id="evidencePanel"><div class="card" id="evidenceList"></div></section>
+
+      <section class="panel" id="bankPanel">
+        <div class="card">
+          <div class="head">
+            <div class="actions">
+              <label class="muted">客服资料（可选）<input type="file" id="csFiles" multiple accept=".csv,.json,.txt"></label>
+            </div>
+            <div class="actions">
+              <select id="runSelect"></select>
+              <button id="generateBtn" title="基于当前证据生成，会消耗 token，但不联网搜索">生成问题库</button>
+            </div>
+          </div>
+          <div class="muted" style="margin-top:8px">生成只使用这份已保存的证据，不再搜索。每次生成都会存档，可在右侧下拉框切换查看。</div>
+        </div>
+        <div class="card" id="bankView"><div class="empty">这份证据还没有生成过问题库。</div></div>
+        <div class="actions" id="exportRow"></div>
+      </section>
+
+      <section class="panel" id="checkPanel"><div class="card" id="checkView"><div class="empty">生成问题库后显示检查结果。</div></div></section>
+
+      <section class="panel" id="livePanel">
+        <div class="card">
+          <div class="head">
+            <div class="actions">
+              <label class="muted">AI 产品 <input id="liveProducts" value="点点,豆包,DeepSeek" style="width:200px"></label>
+              <label class="muted">每题重复 <input id="liveRepeats" type="number" min="1" max="5" value="1" style="width:56px"></label>
+              <button id="livePlanBtn">生成测试计划</button>
+            </div>
+          </div>
+          <div class="muted" style="margin-top:8px">把问题逐条拿去问各个 AI 产品，把回答贴回来。是否提到品牌由程序判断；是否推荐、说得对不对、有没有解决用户的问题，需要人来判断。这里的结果不影响问题库的质量结论。</div>
+        </div>
+        <div id="liveEmpty" class="card empty">先在「问题库」里生成或选择一次问题库，再生成测试计划。</div>
+        <div id="liveBody" class="hidden">
+          <div class="card"><div class="head"><strong>各产品结果</strong><span class="muted" id="liveStatus"></span></div><div id="liveSummary"></div></div>
+          <div class="card" id="livePlan"></div>
+        </div>
+        <div class="card">
+          <div class="head"><strong>引用笔记分析</strong><span class="tag">预留 · 开发中</span></div>
+          <div class="muted" style="margin-top:8px">
+            记录 AI 回答时引用的小红书笔记（标题、作者类型、图文/视频、发布时间、点赞收藏评论、是否写到品牌），
+            按“提到品牌 / 没提到品牌”两组对比这些笔记的共同特点，并标出被多个问题反复引用的笔记、与我们证据的重合比例。
+            后端统计已写好，采集和页面展示还在开发，暂无数据。
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtTime = iso => iso ? iso.replace('T', ' ').slice(0, 16) : '';
+const api = async (path, options) => {
+  const res = await fetch(path, options);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+};
+
+let current = null;   // loaded snapshot
+let models = [];
+let currentRun = null;
+let live = null;
+let serverKey = false;
+const KEY_STORE = 'geoClaudeKey';
+
+function showKeyStatus() {
+  const typed = $('keyInput').value.trim();
+  $('keyStatus').textContent = typed
+    ? '将使用你填写的 Key（只随请求发给本机后端，不写入任何文件）'
+    : serverKey ? '未填写，将使用后端启动时设置的 Key' : '未填写，后端也没有设置 Key，无法搜索和生成';
+}
+
+function persistKey() {
+  try {
+    if ($('rememberKey').checked && $('keyInput').value.trim()) localStorage.setItem(KEY_STORE, $('keyInput').value.trim());
+    else localStorage.removeItem(KEY_STORE);
+  } catch {}
+}
+
+function showModelNote() {
+  const m = models.find(x => x.id === $('modelSelect').value);
+  $('modelNote').textContent = m ? `${m.note}；价格为每百万 token 输入/输出美元` : '';
+}
+const modelLabel = id => (models.find(m => m.id === id) || {}).label || id || '未记录';
+const selectedModel = () => $('modelSelect').value;
+let runs = [];
+
+function showError(message) {
+  $('errorBox').textContent = message;
+  $('errorBox').classList.toggle('hidden', !message);
+}
+
+async function loadHealth() {
+  try {
+    const h = await api('/api/health');
+    serverKey = h.server_key_configured;
+    $('health').textContent = '后端已连接';
+    showKeyStatus();
+    models = h.models;
+    let saved = null;
+    try { saved = localStorage.getItem('geoModel'); } catch {}
+    $('modelSelect').innerHTML = models.map(m =>
+      `<option value="${esc(m.id)}">${esc(m.label)} · $${m.price[0]}/$${m.price[1]}</option>`).join('');
+    $('modelSelect').value = models.some(m => m.id === saved) ? saved : h.default_model;
+    showModelNote();
+  } catch { $('health').textContent = '后端未连接'; }
+}
+
+async function loadSnapshots(selectId) {
+  const list = await api('/api/snapshots');
+  $('snapList').innerHTML = list.length ? list.map(s => `
+    <button class="snap ${current && current.snapshot_id === s.snapshot_id ? 'active' : ''}" data-id="${esc(s.snapshot_id)}">
+      <strong>${esc(s.brand_name)}</strong>
+      <span>${fmtTime(s.created_at)} · ${s.usable_count}/${s.evidence_count} 条可用 · ${esc(s.status)}</span>
+    </button>`).join('') : '<div class="muted">还没有证据快照。</div>';
+  $('snapList').querySelectorAll('.snap').forEach(b => b.onclick = () => openSnapshot(b.dataset.id));
+  if (selectId) openSnapshot(selectId);
+}
+
+async function openSnapshot(id) {
+  showError('');
+  current = await api('/api/snapshots/' + encodeURI(id));
+  const d = current.discovery;
+  $('emptyState').classList.add('hidden');
+  $('workspace').classList.remove('hidden');
+  $('wsBrand').textContent = d.brand_profile?.brand?.name || current.brand_name;
+  $('wsMeta').textContent = `证据快照 ${fmtTime(current.created_at)} · 模型 ${modelLabel(current.model)} · 状态 ${d.status}`;
+  const ev = d.evidence || [];
+  $('wsMetrics').innerHTML = [
+    [ev.length, '证据总数'],
+    [ev.filter(e => e.status === 'usable').length, '已打开核验'],
+    [d.usable_user_evidence_count ?? 0, '可用用户表达'],
+    [d.brand_profile?.products?.length ?? 0, '识别产品'],
+  ].map(([n, l]) => `<div><strong>${n}</strong><span>${l}</span></div>`).join('');
+  $('wsCoverage').textContent = d.coverage_note || '';
+  $('evidenceList').innerHTML = ev.length ? ev.map(e => `
+    <div class="ev">
+      <span class="tag ${esc(e.status)}">${e.status === 'usable' ? '已打开核验' : e.status === 'candidate' ? '仅搜索摘要' : esc(e.status)}</span>
+      <span class="tag">${esc(e.source_type)}</span><span class="tag">${esc(e.author_role)}</span>
+      ${(e.usage || []).map(u => `<span class="tag">${esc(u)}</span>`).join('')}
+      <q>${esc(e.text)}</q>
+      <div class="muted">${esc(e.context)}</div>
+      <a href="${esc(e.source_ref)}" target="_blank" rel="noopener">${esc(e.source_ref)}</a>
+    </div>`).join('') : '<div class="empty">没有证据记录。</div>';
+  loadSnapshots();
+  await loadRuns();
+}
+
+async function loadRuns(selectRunId) {
+  runs = await api('/api/runs?snapshot_id=' + encodeURIComponent(current.snapshot_id));
+  $('runSelect').innerHTML = runs.length
+    ? runs.map(r => `<option value="${esc(r.run_id)}">${fmtTime(r.created_at)} 生成 · ${esc(modelLabel(r.model))}</option>`).join('')
+    : '<option value="">暂无生成记录</option>';
+  if (selectRunId) $('runSelect').value = selectRunId;
+  renderRun(runs.find(r => r.run_id === $('runSelect').value));
+}
+
+function renderRun(run) {
+  currentRun = run || null;
+  loadLive();
+  if (!run) {
+    $('bankView').innerHTML = '<div class="empty">这份证据还没有生成过问题库。</div>';
+    $('checkView').innerHTML = '<div class="empty">生成问题库后显示检查结果。</div>';
+    $('exportRow').innerHTML = '';
+    return;
+  }
+  const bank = run.result.question_bank;
+  const singles = bank.single_turn_questions || [];
+  const chains = bank.multi_turn_chains || [];
+  $('bankView').innerHTML = `
+    <div class="muted">${esc(bank.coverage_note)}</div>
+    <h3>单轮问题（${singles.length}）</h3>
+    ${singles.map(q => `<div class="q">
+      <div>${esc(q.question)}</div>
+      ${q.scene ? `<div class="muted">场景：${esc(q.scene)}${q.intent ? ' · 意图：' + esc(q.intent) : ''}</div>` : ''}
+      <span class="tag">${esc(q.question_type)}</span><span class="tag">${esc(q.brand_visibility)}</span><span class="tag">${esc(q.decision_stage)}</span>
+      <span class="muted">证据 ${(q.evidence_refs || []).map(esc).join('、')}</span>
+    </div>`).join('')}
+    <h3>多轮问题链（${chains.length}）</h3>
+    ${chains.map(c => `<div class="q">
+      <div><strong>${esc(c.scene)}</strong></div>
+      <div class="muted">意图：${esc(c.intent)}</div>
+      ${(c.turns || []).map(t => `<div class="turn"><strong>第 ${t.turn} 轮：</strong>${esc(t.question)}</div>`).join('')}
+    </div>`).join('')}`;
+  const ev = run.evaluation;
+  const label = { pass: '通过', review_required: '待人工复核', fail: '不通过' };
+  $('checkView').innerHTML = `
+    <div class="head"><strong>发布结论</strong><span class="tag ${esc(ev.release_decision)}">${label[ev.release_decision] || esc(ev.release_decision)}</span></div>
+    ${ev.deterministic_checks.map(c => `<div class="q">
+      <span class="tag ${esc(c.status)}">${c.status === 'pass' ? '通过' : '失败'}</span> ${esc(c.details)}
+      ${c.object_refs.length ? `<div class="muted">涉及：${c.object_refs.map(esc).join('、')}</div>` : ''}
+    </div>`).join('')}
+    <div class="muted" style="margin-top:10px" id="checkLive"></div>`;
+  $('exportRow').innerHTML = '<button class="secondary" id="dlJson">下载 JSON</button><button class="secondary" id="dlCsv">下载 CSV</button>';
+  $('dlJson').onclick = () => download(`${current.brand_name}-问题库.json`, JSON.stringify(run, null, 2), 'application/json');
+  $('dlCsv').onclick = () => {
+    const rows = [['类型', 'ID', '场景', '意图', '轮次', '问题']];
+    singles.forEach(q => rows.push(['单轮', q.question_id, q.scene || '', q.intent || '', '', q.question]));
+    chains.forEach(c => (c.turns || []).forEach(t => rows.push(['多轮', c.question_chain_id, c.scene, c.intent, t.turn, t.question])));
+    download(`${current.brand_name}-问题库.csv`, '﻿' + rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n'), 'text/csv');
+  };
+}
+
+const POS = { absent: '未提及', mentioned: '提及', compared: '比较', recommended: '推荐', not_applicable: '不适用' };
+const JUD = { pass: '通过', fail: '不通过', review: '待判断', not_assessed: '未评估', not_applicable: '不适用' };
+const opts = (map, keys, value) => keys.map(k => `<option value="${k}" ${k === value ? 'selected' : ''}>${map[k]}</option>`).join('');
+
+async function loadLive() {
+  live = null;
+  if (currentRun) {
+    try { live = await api('/api/live?run_id=' + encodeURIComponent(currentRun.run_id)); } catch (e) { showError(e.message); }
+  }
+  if (live) {
+    $('liveProducts').value = live.products.join(',');
+    $('liveRepeats').value = live.repeats;
+  }
+  renderLive();
+}
+
+function renderLive() {
+  $('liveEmpty').textContent = currentRun ? '还没有测试计划。填好要测的 AI 产品，点「生成测试计划」。' : '先在「问题库」里生成或选择一次问题库，再生成测试计划。';
+  $('liveEmpty').classList.toggle('hidden', !!live);
+  $('liveBody').classList.toggle('hidden', !live);
+  $('livePlanBtn').disabled = !currentRun;
+  const liveLabel = { not_run: '未运行', partial: '进行中', complete: '已完成' };
+  if ($('checkLive')) $('checkLive').textContent = `AI 实测：${live ? liveLabel[live.live_test_status] : '未运行'}（单独统计，不影响上面的结论）`;
+  if (!live) return;
+  const label = { not_run: '未开始', partial: '进行中', complete: '已完成' };
+  $('liveStatus').textContent = `${label[live.live_test_status] || ''} · 识别品牌用词：${live.brand_terms.join('、')}`;
+  const rows = live.summary || [];
+  const plannedBy = p => live.plan.filter(x => x.product === p).length;
+  $('liveSummary').innerHTML = rows.length ? `<table class="sum"><tr><th>产品</th><th>已记录/计划</th><th>未提及</th><th>提及</th><th>比较</th><th>推荐</th><th>事实错误</th><th>满足意图</th><th>待判断</th></tr>${
+    rows.map(r => `<tr><td>${esc(r.product)}</td><td>${r.completed}/${plannedBy(r.product)}</td><td>${r.absent}</td><td>${r.mentioned}</td><td>${r.compared}</td><td>${r.recommended}</td><td>${r.accuracy_fail}</td><td>${r.intent_pass}</td><td>${r.needs_review}</td></tr>`).join('')
+  }</table><div class="muted" style="margin-top:6px">各项分开统计，不合成一个总分。</div>` : '<div class="muted" style="margin-top:8px">还没有记录。</div>';
+
+  const obsKey = o => `${o.product}|${o.question_ref}|${o.repeat_index}`;
+  const obs = Object.fromEntries(live.observations.map(o => [obsKey(o), o]));
+  $('livePlan').innerHTML = '<h3 style="margin-top:0">测试计划</h3>' + live.plan.map((item, i) => {
+    const o = obs[obsKey(item)];
+    const tag = o ? `<span class="tag ${o.brand_position === 'absent' ? 'fail' : 'pass'}">${POS[o.brand_position]}</span>` : '<span class="tag">未记录</span>';
+    return `<div class="lrow">
+      <div class="head"><div>${tag}<strong>${esc(item.product)}</strong> · ${esc(item.question_ref)}${live.repeats > 1 ? ` · 第 ${item.repeat_index} 次` : ''} · ${item.mode === 'multi_turn' ? '多轮' : '单轮'}</div>
+      <div class="actions"><button class="secondary small" data-copy="${i}">复制问题</button><button class="secondary small" data-edit="${i}">${o ? '修改记录' : '记录回答'}</button></div></div>
+      ${item.turns.map((q, t) => `<div class="turn">${item.turns.length > 1 ? `<strong>第 ${t + 1} 轮：</strong>` : ''}${esc(q)}</div>`).join('')}
+      ${o ? `<details><summary class="muted">查看回答 · 事实 ${JUD[o.factual_accuracy]} · 引用 ${JUD[o.citation_quality]} · 意图 ${JUD[o.intent_satisfaction]}${o.notes ? ' · ' + esc(o.notes) : ''}</summary>${o.turns.map(t => `<div class="resp">${esc(t.response)}</div>`).join('')}${o.citations.length ? `<div class="muted">引用：${o.citations.map(esc).join('、')}</div>` : ''}</details>` : ''}
+      <div id="lform${i}"></div>
+    </div>`;
+  }).join('');
+  $('livePlan').querySelectorAll('[data-copy]').forEach(b => b.onclick = async () => {
+    const item = live.plan[+b.dataset.copy];
+    try { await navigator.clipboard.writeText(item.turns.join('\n')); b.textContent = '已复制'; } catch { b.textContent = '复制失败'; }
+  });
+  $('livePlan').querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openLiveForm(+b.dataset.edit, obs[obsKey(live.plan[+b.dataset.edit])]));
+}
+
+function openLiveForm(i, o) {
+  const item = live.plan[i];
+  const box = $('lform' + i);
+  if (box.innerHTML) { box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="lform">
+    <div class="lgrid">
+      <label class="muted">模型或版本 <input data-f="model" value="${esc(o?.model_or_version || '')}" placeholder="可不填"></label>
+      <label class="muted">运行状态 <select data-f="status">${opts({ completed: '已完成', failed: '失败', blocked: '被拦截/无法提问' }, ['completed', 'failed', 'blocked'], o?.run_status || 'completed')}</select></label>
+    </div>
+    ${item.turns.map((q, t) => `<label class="muted">${item.turns.length > 1 ? `第 ${t + 1} 轮回答` : 'AI 的回答'}（粘贴全文）<textarea data-turn="${t}">${esc(o?.turns?.[t]?.response || '')}</textarea></label>`).join('')}
+    <label class="muted">回答里引用的来源（每行一个，可不填）<textarea data-f="cites" style="min-height:50px">${esc((o?.citations || []).join('\n'))}</textarea></label>
+    <div class="lgrid">
+      <label class="muted">品牌位置 <select data-f="pos"><option value="">自动判断</option>${opts(POS, ['mentioned', 'compared', 'recommended'], o && ['compared', 'recommended'].includes(o.brand_position) ? o.brand_position : '')}</select></label>
+      <label class="muted">品牌描述准确 <select data-f="acc"><option value="">自动</option>${opts(JUD, ['pass', 'fail', 'review', 'not_assessed'], o?.factual_accuracy)}</select></label>
+      <label class="muted">引用质量 <select data-f="cit"><option value="">自动</option>${opts(JUD, ['pass', 'fail', 'review', 'not_applicable'], o?.citation_quality)}</select></label>
+      <label class="muted">满足用户意图 <select data-f="int"><option value="">自动</option>${opts(JUD, ['pass', 'fail', 'review', 'not_assessed'], o?.intent_satisfaction)}</select></label>
+    </div>
+    <label class="muted">备注 <input data-f="notes" value="${esc(o?.notes || '')}" style="width:100%"></label>
+    <div class="actions"><button data-save>保存记录</button><span class="muted">「推荐」「比较」只能在回答里确实出现品牌时选择。</span></div>
+  </div>`;
+  const f = k => box.querySelector(`[data-f="${k}"]`).value.trim();
+  box.querySelector('[data-save]').onclick = async () => {
+    const record = {
+      product: item.product, question_ref: item.question_ref, repeat_index: item.repeat_index,
+      model_or_version: f('model'), run_status: f('status'),
+      turns: item.turns.map((q, t) => ({ question: q, response: box.querySelector(`[data-turn="${t}"]`).value })),
+      citations: f('cites').split('\n').map(x => x.trim()).filter(Boolean),
+      brand_position: f('pos') || undefined, factual_accuracy: f('acc') || undefined,
+      citation_quality: f('cit') || undefined, intent_satisfaction: f('int') || undefined, notes: f('notes'),
+    };
+    try {
+      showError('');
+      live = await api('/api/live/record', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ run_id: currentRun.run_id, records: [record] }) });
+      renderLive();
+    } catch (e) { showError(e.message); }
+  };
+}
+
+$('livePlanBtn').onclick = async () => {
+  if (!currentRun) return;
+  const products = $('liveProducts').value.split(/[,，]/).map(x => x.trim()).filter(Boolean);
+  try {
+    showError('');
+    live = await api('/api/live/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ run_id: currentRun.run_id, products, repeats: +$('liveRepeats').value || 1 }) });
+    renderLive();
+  } catch (e) { showError(e.message); }
+};
+
+function download(name, text, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+async function runJob(path, payload) {
+  showError('');
+  document.querySelectorAll('#discoverBtn, #refreshBtn, #generateBtn').forEach(b => b.disabled = true);
+  $('jobBox').classList.remove('hidden');
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    const key = $('keyInput').value.trim();
+    if (key) headers['X-Anthropic-Key'] = key;
+    const { job_id } = await api(path, { method: 'POST', headers, body: JSON.stringify(payload) });
+    for (;;) {
+      await new Promise(r => setTimeout(r, 1500));
+      const job = await api('/api/jobs/' + job_id);
+      $('jobStage').textContent = job.stage;
+      $('jobBar').style.width = job.progress + '%';
+      if (job.status === 'completed') return job.result;
+      if (job.status === 'failed') throw new Error(job.error);
+    }
+  } finally {
+    $('jobBox').classList.add('hidden');
+    document.querySelectorAll('#discoverBtn, #refreshBtn, #generateBtn').forEach(b => b.disabled = false);
+  }
+}
+
+async function discover(brand) {
+  if (!brand) return $('brandInput').focus();
+  const existing = (await api('/api/snapshots')).filter(s => s.brand_name.toLowerCase() === brand.toLowerCase());
+  if (existing.length && !confirm(`「${brand}」已有 ${existing.length} 份证据快照。重新搜索会再次消耗 token，确定吗？`)) {
+    return openSnapshot(existing[0].snapshot_id);
+  }
+  try {
+    const summary = await runJob('/api/discover', { brand_name: brand, model: selectedModel() });
+    $('brandInput').value = '';
+    await loadSnapshots(summary.snapshot_id);
+  } catch (e) { showError(e.message); }
+}
+
+$('discoverBtn').onclick = () => discover($('brandInput').value.trim());
+$('brandInput').onkeydown = e => { if (e.key === 'Enter') discover($('brandInput').value.trim()); };
+$('refreshBtn').onclick = () => discover(current.brand_name);
+$('modelSelect').onchange = () => {
+  try { localStorage.setItem('geoModel', selectedModel()); } catch {}
+  showModelNote();
+};
+$('runSelect').onchange = () => renderRun(runs.find(r => r.run_id === $('runSelect').value));
+$('generateBtn').onclick = async () => {
+  try {
+    const files = await Promise.all([...$('csFiles').files].map(async f => ({ name: f.name, content: await f.text() })));
+    const run = await runJob('/api/generate', { snapshot_id: current.snapshot_id, customer_service_files: files, model: selectedModel() });
+    await loadRuns(run.run_id);
+  } catch (e) { showError(e.message); }
+};
+document.querySelectorAll('.tab').forEach(tab => tab.onclick = () => {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === tab));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === tab.dataset.panel));
+});
+
+try {
+  const storedKey = localStorage.getItem(KEY_STORE);
+  if (storedKey) { $('keyInput').value = storedKey; $('rememberKey').checked = true; }
+} catch {}
+$('keyInput').oninput = () => { persistKey(); showKeyStatus(); };
+$('rememberKey').onchange = persistKey;
+loadHealth();
+loadSnapshots().catch(e => showError(e.message));
+</script>
+</body>
+</html>

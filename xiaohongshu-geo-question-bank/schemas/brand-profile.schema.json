@@ -1,0 +1,222 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schemas/brand-profile.schema.json",
+  "title": "Xiaohongshu GEO Brand Profile",
+  "description": "Normalized internal brand facts used by both merchant-API and public-evidence modes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "input_mode",
+    "brand",
+    "products",
+    "competitors",
+    "ambiguous_terms",
+    "missing_facts"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "input_mode": {
+      "type": "string",
+      "enum": ["merchant_api", "public_evidence"]
+    },
+    "brand": {
+      "$ref": "#/$defs/brand"
+    },
+    "products": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/product"
+      }
+    },
+    "competitors": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/entity"
+      }
+    },
+    "ambiguous_terms": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ambiguousTerm"
+      }
+    },
+    "missing_facts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/missingFact"
+      }
+    }
+  },
+  "anyOf": [
+    {
+      "properties": {
+        "brand": {
+          "properties": {
+            "category_scope": {
+              "minItems": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "products": {
+          "minItems": 1
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nullableIdentifier": {
+      "type": ["string", "null"],
+      "minLength": 1
+    },
+    "stringList": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/nonEmptyString"
+      },
+      "uniqueItems": true
+    },
+    "sourceRefs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/nonEmptyString"
+      },
+      "uniqueItems": true
+    },
+    "brand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["brand_id", "name", "aliases", "category_scope", "source_refs"],
+      "properties": {
+        "brand_id": {
+          "$ref": "#/$defs/nullableIdentifier"
+        },
+        "name": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "aliases": {
+          "$ref": "#/$defs/stringList"
+        },
+        "category_scope": {
+          "$ref": "#/$defs/stringList"
+        },
+        "source_refs": {
+          "$ref": "#/$defs/sourceRefs"
+        }
+      }
+    },
+    "product": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "product_id",
+        "name",
+        "aliases",
+        "category",
+        "attributes",
+        "faq",
+        "fact_status",
+        "source_refs"
+      ],
+      "properties": {
+        "product_id": {
+          "$ref": "#/$defs/nullableIdentifier"
+        },
+        "name": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "aliases": {
+          "$ref": "#/$defs/stringList"
+        },
+        "category": {
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "attributes": {
+          "$ref": "#/$defs/stringList"
+        },
+        "faq": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/faqItem"
+          }
+        },
+        "fact_status": {
+          "type": "string",
+          "enum": ["confirmed", "candidate"]
+        },
+        "source_refs": {
+          "$ref": "#/$defs/sourceRefs"
+        }
+      }
+    },
+    "faqItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["question", "answer", "source_refs"],
+      "properties": {
+        "question": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "answer": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "source_refs": {
+          "$ref": "#/$defs/sourceRefs"
+        }
+      }
+    },
+    "entity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "aliases", "source_refs"],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "aliases": {
+          "$ref": "#/$defs/stringList"
+        },
+        "source_refs": {
+          "$ref": "#/$defs/sourceRefs"
+        }
+      }
+    },
+    "ambiguousTerm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["term", "reason"],
+      "properties": {
+        "term": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "reason": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "missingFact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field", "reason"],
+      "properties": {
+        "field": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "reason": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    }
+  }
+}

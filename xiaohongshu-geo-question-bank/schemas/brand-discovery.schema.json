@@ -1,0 +1,87 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "requested_brand_name",
+    "resolved_brand_name",
+    "aliases",
+    "category_scope",
+    "products",
+    "competitors",
+    "evidence",
+    "coverage_note",
+    "missing_information"
+  ],
+  "properties": {
+    "status": {"type": "string", "enum": ["ready", "insufficient", "ambiguous"]},
+    "requested_brand_name": {"type": "string"},
+    "resolved_brand_name": {"type": ["string", "null"]},
+    "aliases": {"type": "array", "items": {"type": "string"}},
+    "category_scope": {"type": "array", "items": {"type": "string"}},
+    "products": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "category", "attributes", "source_refs", "fact_status"],
+        "properties": {
+          "name": {"type": "string"},
+          "category": {"type": ["string", "null"]},
+          "attributes": {"type": "array", "items": {"type": "string"}},
+          "source_refs": {"type": "array", "items": {"type": "string"}},
+          "fact_status": {"type": "string", "enum": ["confirmed", "candidate"]}
+        }
+      }
+    },
+    "competitors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "aliases", "source_refs"],
+        "properties": {
+          "name": {"type": "string"},
+          "aliases": {"type": "array", "items": {"type": "string"}},
+          "source_refs": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_type",
+          "source_ref",
+          "author_role",
+          "text",
+          "context",
+          "usage",
+          "verification"
+        ],
+        "properties": {
+          "source_type": {
+            "type": "string",
+            "enum": ["post", "comment", "reply", "official_brand_page", "shop_page", "product_page"]
+          },
+          "source_ref": {"type": "string"},
+          "author_role": {"type": "string", "enum": ["user", "creator", "brand", "merchant", "unknown"]},
+          "text": {"type": "string"},
+          "context": {"type": "string"},
+          "usage": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["brand_fact", "scene_signal", "intent_signal", "question_expression", "contradiction"]
+            }
+          },
+          "verification": {"type": "string", "enum": ["opened_page", "search_result_only"]}
+        }
+      }
+    },
+    "coverage_note": {"type": "string"},
+    "missing_information": {"type": "array", "items": {"type": "string"}}
+  }
+}

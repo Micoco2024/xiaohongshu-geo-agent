@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/xiaohongshu-geo/question-bank.schema.json",
+  "title": "XiaohongshuGEOQuestionBank",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "target_brand", "coverage_note", "single_turn_questions", "multi_turn_chains"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "target_brand": {"type": "string", "minLength": 1},
+    "coverage_note": {"type": "string", "minLength": 1},
+    "single_turn_questions": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/singleTurnQuestion"}
+    },
+    "multi_turn_chains": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/multiTurnChain"}
+    }
+  },
+  "anyOf": [
+    {"properties": {"single_turn_questions": {"minItems": 1}}},
+    {"properties": {"multi_turn_chains": {"minItems": 1}}}
+  ],
+  "$defs": {
+    "questionType": {
+      "enum": [
+        "need_recognition",
+        "how_to",
+        "category_choice",
+        "brand_recommendation",
+        "competitor_comparison",
+        "brand_validation",
+        "risk_validation",
+        "usage_optimization",
+        "after_sales",
+        "purchase_decision"
+      ]
+    },
+    "brandVisibility": {"enum": ["unbranded", "branded", "context_dependent"]},
+    "decisionStage": {
+      "enum": [
+        "need_recognition",
+        "solution_exploration",
+        "category_choice",
+        "criteria_narrowing",
+        "brand_comparison",
+        "risk_validation",
+        "purchase_decision",
+        "usage_optimization",
+        "after_sales"
+      ]
+    },
+    "questionCore": {
+      "type": "object",
+      "required": [
+        "question_id",
+        "question",
+        "question_variants",
+        "question_type",
+        "brand_visibility",
+        "decision_stage",
+        "evidence_refs"
+      ],
+      "properties": {
+        "question_id": {"type": "string", "pattern": "^GEO-Q-[0-9]{4,}$"},
+        "question": {"type": "string", "minLength": 1},
+        "question_variants": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "question_type": {"$ref": "#/$defs/questionType"},
+        "brand_visibility": {"$ref": "#/$defs/brandVisibility"},
+        "decision_stage": {"$ref": "#/$defs/decisionStage"},
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^EV-[A-F0-9]{12}$"}
+        }
+      }
+    },
+    "singleTurnQuestion": {
+      "allOf": [
+        {"$ref": "#/$defs/questionCore"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "question_id",
+            "question",
+            "question_variants",
+            "question_type",
+            "test_mode",
+            "brand_visibility",
+            "scene_id",
+            "scene",
+            "intent_id",
+            "intent",
+            "decision_stage",
+            "target_brand",
+            "evidence_refs"
+          ],
+          "properties": {
+            "question_id": {"type": "string"},
+            "question": {"type": "string"},
+            "question_variants": {"type": "array"},
+            "question_type": {},
+            "test_mode": {"const": "single_turn"},
+            "brand_visibility": {},
+            "scene_id": {"type": "string", "pattern": "^XHS-SCN-[0-9]{3,}$"},
+            "scene": {"type": "string", "minLength": 1},
+            "intent_id": {"type": "string", "pattern": "^XHS-INT-[0-9]{3,}$"},
+            "intent": {"type": "string", "minLength": 1},
+            "decision_stage": {},
+            "target_brand": {"type": "string", "minLength": 1},
+            "evidence_refs": {"type": "array"}
+          }
+        }
+      ]
+    },
+    "multiTurnChain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "question_chain_id",
+        "test_mode",
+        "scene_id",
+        "scene",
+        "intent_id",
+        "intent",
+        "target_brand",
+        "turns"
+      ],
+      "properties": {
+        "question_chain_id": {"type": "string", "pattern": "^GEO-CHAIN-[0-9]{3,}$"},
+        "test_mode": {"const": "multi_turn"},
+        "scene_id": {"type": "string", "pattern": "^XHS-SCN-[0-9]{3,}$"},
+        "scene": {"type": "string", "minLength": 1},
+        "intent_id": {"type": "string", "pattern": "^XHS-INT-[0-9]{3,}$"},
+        "intent": {"type": "string", "minLength": 1},
+        "target_brand": {"type": "string", "minLength": 1},
+        "turns": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "allOf": [
+              {"$ref": "#/$defs/questionCore"},
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "question_id",
+                  "turn",
+                  "question",
+                  "question_variants",
+                  "question_type",
+                  "brand_visibility",
+                  "decision_stage",
+                  "evidence_refs"
+                ],
+                "properties": {
+                  "question_id": {"type": "string"},
+                  "turn": {"type": "integer", "minimum": 1},
+                  "question": {"type": "string"},
+                  "question_variants": {"type": "array"},
+                  "question_type": {},
+                  "brand_visibility": {},
+                  "decision_stage": {},
+                  "evidence_refs": {"type": "array"}
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

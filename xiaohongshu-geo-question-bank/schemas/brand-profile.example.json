@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0",
+  "input_mode": "public_evidence",
+  "brand": {
+    "brand_id": null,
+    "name": "示例品牌",
+    "aliases": ["Example Brand"],
+    "category_scope": ["面部防晒"],
+    "source_refs": ["USER-INPUT-001"]
+  },
+  "products": [
+    {
+      "product_id": null,
+      "name": "示例轻透防晒乳",
+      "aliases": [],
+      "category": "面部防晒",
+      "attributes": ["轻薄"],
+      "faq": [],
+      "fact_status": "candidate",
+      "source_refs": ["XHS-PUBLIC-001"]
+    }
+  ],
+  "competitors": [],
+  "ambiguous_terms": [],
+  "missing_facts": [
+    {
+      "field": "products[0].product_id",
+      "reason": "无商家API，公开页面未提供稳定商品ID"
+    }
+  ]
+}

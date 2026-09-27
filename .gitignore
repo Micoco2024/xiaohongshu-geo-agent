@@ -1,0 +1,10 @@
+__pycache__/
+.pytest_cache/
+.DS_Store
+xiaohongshu-geo-workbench/data/
+xiaohongshu-geo-miniprogram/
+xiaohongshu-geo-test-page/
+node_modules/
+小红书GEO-Agent文件树.html
+小红书GEO双Agent测试架构.md
+小红书品牌场景与用户意图洞察Agent-目的与约束.md
