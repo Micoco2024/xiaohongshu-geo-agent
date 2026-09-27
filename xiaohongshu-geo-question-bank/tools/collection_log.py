@@ -18,10 +18,17 @@ from evidence_store import brand_key
 
 
 PURPOSES = ("seed", "theoretical", "brand_free", "comparison")
+# Xiaohongshu does not publish its limits. These defaults are conservative
+# starting points; the log records how long each recovery actually took
+# (`recovery_history`) so they can be tuned per account from real data.
 PAGES_PER_BATCH = 5
 RECOVERY_PAGES_PER_BATCH = 3
 NORMAL_COOLDOWN_MINUTES = 20
-RATE_LIMIT_COOLDOWN_MINUTES = 90
+# Going over our own page budget is not a platform limit: a small penalty only.
+OVER_BUDGET_MINUTES_PER_PAGE = 5
+# A real rate limit: 30 min, doubled for each consecutive limited batch.
+RATE_LIMIT_BASE_MINUTES = 30
+RATE_LIMIT_MAX_MINUTES = 240
 
 
 class CollectionLogError(ValueError):
@@ -79,10 +86,39 @@ def _clean(queries: Iterable[str]) -> set[str]:
     return {q.strip() for q in queries if q and q.strip()}
 
 
-def _strict(batch: dict[str, Any]) -> bool:
-    """A batch that hit a rate limit or went over its page budget earns the
-    long cooldown and a recovery-sized next batch."""
-    return bool(batch.get("rate_limited") or batch.get("over_budget"))
+def _limited_streak(batches: list[dict[str, Any]]) -> int:
+    """Consecutive rate-limited batches at the end of the log."""
+    streak = 0
+    for b in reversed(batches):
+        if not b.get("rate_limited"):
+            break
+        streak += 1
+    return streak
+
+
+def cooldown_minutes(batches: list[dict[str, Any]]) -> int:
+    if not batches:
+        return 0
+    streak = _limited_streak(batches)
+    if streak:
+        return min(RATE_LIMIT_BASE_MINUTES * 2 ** (streak - 1), RATE_LIMIT_MAX_MINUTES)
+    last = batches[-1]
+    extra = max(0, last.get("pages_loaded", 0) - last.get("page_budget", PAGES_PER_BATCH)) if last.get("over_budget") else 0
+    return NORMAL_COOLDOWN_MINUTES + OVER_BUDGET_MINUTES_PER_PAGE * extra
+
+
+def recovery_history(batches: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """For every batch that followed a rate-limited one: how long after the
+    limit it ran and whether it got through. Time is end-to-end between the
+    two batches, so it slightly overstates the wait."""
+    history = []
+    for prev, cur in zip(batches, batches[1:]):
+        if prev.get("rate_limited"):
+            waited = datetime.fromisoformat(cur["ended_at"]) - datetime.fromisoformat(prev["ended_at"])
+            history.append({"limited_batch": prev["batch"], "next_batch": cur["batch"],
+                            "waited_minutes": int(waited.total_seconds() // 60),
+                            "recovered": not cur.get("rate_limited")})
+    return history
 
 
 def check_batch(
@@ -113,7 +149,7 @@ def check_batch(
         raise CollectionLogError("a query cannot be both done and rate-limited")
     if limited and not rate_limited:
         raise CollectionLogError("queries_limited requires rate_limited=True")
-    recovery = bool(log["batches"] and _strict(log["batches"][-1]))
+    recovery = bool(log["batches"] and log["batches"][-1].get("rate_limited"))
     page_budget = RECOVERY_PAGES_PER_BATCH if recovery else PAGES_PER_BATCH
     return {"page_budget": page_budget, "over_budget": pages_loaded > page_budget}
 
@@ -191,17 +227,17 @@ def status(root: str | Path, brand: str, *, now: datetime | None = None) -> dict
     current = (now or datetime.now()).replace(microsecond=0)
     last_batch = batches[-1] if batches else None
     last_limited = next((b for b in reversed(batches) if b["rate_limited"]), None)
-    cooldown_minutes = RATE_LIMIT_COOLDOWN_MINUTES if last_batch and _strict(last_batch) else NORMAL_COOLDOWN_MINUTES
+    cooldown = cooldown_minutes(batches)
     resume_after = None
     collection_allowed = True
     wait_seconds = 0
     if last_batch:
         ended = datetime.fromisoformat(last_batch["ended_at"])
-        resume = ended + timedelta(minutes=cooldown_minutes)
+        resume = ended + timedelta(minutes=cooldown)
         resume_after = resume.isoformat()
         wait_seconds = max(0, int((resume - current).total_seconds()))
         collection_allowed = wait_seconds == 0
-    recovery = bool(last_batch and _strict(last_batch))
+    recovery = bool(last_batch and last_batch.get("rate_limited"))
     page_budget = RECOVERY_PAGES_PER_BATCH if recovery else PAGES_PER_BATCH
     mode = "external_index_first"
     planned = []
@@ -216,6 +252,9 @@ def status(root: str | Path, brand: str, *, now: datetime | None = None) -> dict
         "collection_allowed": collection_allowed,
         "resume_after": resume_after,
         "wait_seconds": wait_seconds,
+        "cooldown_minutes": cooldown,
+        "consecutive_rate_limits": _limited_streak(batches),
+        "recovery_history": recovery_history(batches),
         "pages_per_batch": page_budget,
         "recommended_discovery_mode": mode,
         "planned_queries": planned,

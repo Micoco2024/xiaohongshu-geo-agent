@@ -38,7 +38,7 @@ class CollectionLogTests(unittest.TestCase):
             self.assertFalse(s["collection_allowed"])
             self.assertEqual(s["pages_per_batch"], 3)
             self.assertEqual(s["recommended_discovery_mode"], "external_index_first")
-            resumed = status(root, "星巴克", now=ended + timedelta(minutes=91))
+            resumed = status(root, "星巴克", now=ended + timedelta(minutes=31))
             self.assertTrue(resumed["collection_allowed"])
             with self.assertRaises(CollectionLogError):
                 record_batch(root, "星巴克", batch=1, queries_done=[], note_urls=[], pages_loaded=0, rate_limited=False)
@@ -51,16 +51,35 @@ class CollectionLogTests(unittest.TestCase):
             with self.assertRaises(CollectionLogError):
                 record_batch(root, "星巴克", batch=2, queries_done=[], note_urls=[], pages_loaded=-1, rate_limited=False)
 
-    def test_over_budget_batch_is_kept_flagged_and_lengthens_cooldown(self):
+    def test_over_budget_batch_is_kept_with_small_penalty(self):
         with tempfile.TemporaryDirectory() as root:
             ended = datetime(2026, 9, 27, 12, 0, 0)
             s = record_batch(root, "星巴克", batch=1, queries_done=["星巴克 自习"], note_urls=[URL],
-                             pages_loaded=6, rate_limited=False, now=ended)
+                             pages_loaded=7, rate_limited=False, now=ended)
             self.assertTrue(s["batches"][-1]["over_budget"])
-            self.assertEqual(s["batches"][-1]["page_budget"], 5)
-            self.assertEqual(s["pages_per_batch"], 3)  # recovery-sized next batch
-            self.assertFalse(status(root, "星巴克", now=ended + timedelta(minutes=30))["collection_allowed"])
-            self.assertTrue(status(root, "星巴克", now=ended + timedelta(minutes=91))["collection_allowed"])
+            self.assertEqual(s["cooldown_minutes"], 30)  # 20 + 2 extra pages x 5
+            self.assertEqual(s["pages_per_batch"], 5)  # not a platform limit: budget unchanged
+            self.assertTrue(status(root, "星巴克", now=ended + timedelta(minutes=31))["collection_allowed"])
+
+    def test_consecutive_rate_limits_double_the_cooldown_and_history_is_kept(self):
+        with tempfile.TemporaryDirectory() as root:
+            t = datetime(2026, 9, 27, 12, 0, 0)
+            kw = dict(queries_done=[], note_urls=[], pages_loaded=1)
+            self.assertEqual(record_batch(root, "星巴克", batch=1, rate_limited=True, now=t, **kw)["cooldown_minutes"], 30)
+            t += timedelta(minutes=35)
+            self.assertEqual(record_batch(root, "星巴克", batch=2, rate_limited=True, now=t, **kw)["cooldown_minutes"], 60)
+            t += timedelta(minutes=65)
+            self.assertEqual(record_batch(root, "星巴克", batch=3, rate_limited=True, now=t, **kw)["cooldown_minutes"], 120)
+            t += timedelta(minutes=125)
+            s = record_batch(root, "星巴克", batch=4, rate_limited=False, now=t, **kw)
+            self.assertEqual(s["cooldown_minutes"], 20)
+            self.assertEqual(s["consecutive_rate_limits"], 0)
+            self.assertEqual([h["waited_minutes"] for h in s["recovery_history"]], [35, 65, 125])
+            self.assertEqual([h["recovered"] for h in s["recovery_history"]], [False, False, True])
+            for i in range(5, 9):
+                t += timedelta(minutes=300)
+                s = record_batch(root, "星巴克", batch=i, rate_limited=True, now=t, **kw)
+            self.assertEqual(s["cooldown_minutes"], 240)  # capped
 
     def test_successful_batch_has_short_cooldown_and_marks_query_done(self):
         with tempfile.TemporaryDirectory() as root:
