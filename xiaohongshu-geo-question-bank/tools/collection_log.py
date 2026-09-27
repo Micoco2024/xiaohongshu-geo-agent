@@ -75,6 +75,49 @@ def plan_queries(root: str | Path, brand: str, queries: list[dict[str, Any]]) ->
     return status(root, brand)
 
 
+def _clean(queries: Iterable[str]) -> set[str]:
+    return {q.strip() for q in queries if q and q.strip()}
+
+
+def _strict(batch: dict[str, Any]) -> bool:
+    """A batch that hit a rate limit or went over its page budget earns the
+    long cooldown and a recovery-sized next batch."""
+    return bool(batch.get("rate_limited") or batch.get("over_budget"))
+
+
+def check_batch(
+    root: str | Path,
+    brand: str,
+    *,
+    batch: int,
+    queries_done: Iterable[str],
+    pages_loaded: int,
+    rate_limited: bool,
+    queries_limited: Iterable[str] = (),
+) -> dict[str, Any]:
+    """Validate a batch before anything is written.
+
+    Raises on inputs that cannot be recorded truthfully. Going over the page
+    budget is not an error: the pages were already loaded, so the batch is
+    kept and flagged, and the next cooldown is lengthened.
+    """
+    if not isinstance(batch, int) or batch < 1:
+        raise CollectionLogError("batch must be a positive integer")
+    log = load_log(root, brand)
+    if any(b["batch"] == batch for b in log["batches"]):
+        raise CollectionLogError(f"batch {batch} already recorded")
+    if not isinstance(pages_loaded, int) or pages_loaded < 0:
+        raise CollectionLogError("pages_loaded must be a non-negative integer")
+    done, limited = _clean(queries_done), _clean(queries_limited)
+    if done & limited:
+        raise CollectionLogError("a query cannot be both done and rate-limited")
+    if limited and not rate_limited:
+        raise CollectionLogError("queries_limited requires rate_limited=True")
+    recovery = bool(log["batches"] and _strict(log["batches"][-1]))
+    page_budget = RECOVERY_PAGES_PER_BATCH if recovery else PAGES_PER_BATCH
+    return {"page_budget": page_budget, "over_budget": pages_loaded > page_budget}
+
+
 def record_batch(
     root: str | Path,
     brand: str,
@@ -87,20 +130,11 @@ def record_batch(
     queries_limited: Iterable[str] = (),
     now: datetime | None = None,
 ) -> dict[str, Any]:
+    budget = check_batch(root, brand, batch=batch, queries_done=queries_done, pages_loaded=pages_loaded,
+                         rate_limited=rate_limited, queries_limited=queries_limited)
     log = load_log(root, brand)
-    if any(b["batch"] == batch for b in log["batches"]):
-        raise CollectionLogError(f"batch {batch} already recorded")
-    recovery = bool(log["batches"] and log["batches"][-1]["rate_limited"])
-    page_limit = RECOVERY_PAGES_PER_BATCH if recovery else PAGES_PER_BATCH
-    if not isinstance(pages_loaded, int) or not 0 <= pages_loaded <= page_limit:
-        raise CollectionLogError(f"pages_loaded must be between 0 and {page_limit}")
     ended = (now or datetime.now()).replace(microsecond=0)
-    done = set(q.strip() for q in queries_done if q and q.strip())
-    limited = set(q.strip() for q in queries_limited if q and q.strip())
-    if done & limited:
-        raise CollectionLogError("a query cannot be both done and rate-limited")
-    if limited and not rate_limited:
-        raise CollectionLogError("queries_limited requires rate_limited=True")
+    done, limited = _clean(queries_done), _clean(queries_limited)
     attempted = done | limited
     for q in log["queries"]:
         q.setdefault("attempt_count", 0)
@@ -141,6 +175,8 @@ def record_batch(
     log["batches"].append({
         "batch": batch,
         "pages_loaded": pages_loaded,
+        "page_budget": budget["page_budget"],
+        "over_budget": budget["over_budget"],
         "new_notes": len(new_notes),
         "rate_limited": rate_limited,
         "ended_at": ended.isoformat(),
@@ -155,7 +191,7 @@ def status(root: str | Path, brand: str, *, now: datetime | None = None) -> dict
     current = (now or datetime.now()).replace(microsecond=0)
     last_batch = batches[-1] if batches else None
     last_limited = next((b for b in reversed(batches) if b["rate_limited"]), None)
-    cooldown_minutes = RATE_LIMIT_COOLDOWN_MINUTES if last_batch and last_batch["rate_limited"] else NORMAL_COOLDOWN_MINUTES
+    cooldown_minutes = RATE_LIMIT_COOLDOWN_MINUTES if last_batch and _strict(last_batch) else NORMAL_COOLDOWN_MINUTES
     resume_after = None
     collection_allowed = True
     wait_seconds = 0
@@ -165,7 +201,7 @@ def status(root: str | Path, brand: str, *, now: datetime | None = None) -> dict
         resume_after = resume.isoformat()
         wait_seconds = max(0, int((resume - current).total_seconds()))
         collection_allowed = wait_seconds == 0
-    recovery = bool(last_batch and last_batch["rate_limited"])
+    recovery = bool(last_batch and _strict(last_batch))
     page_budget = RECOVERY_PAGES_PER_BATCH if recovery else PAGES_PER_BATCH
     mode = "external_index_first"
     planned = []

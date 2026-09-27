@@ -43,12 +43,24 @@ class CollectionLogTests(unittest.TestCase):
             with self.assertRaises(CollectionLogError):
                 record_batch(root, "星巴克", batch=1, queries_done=[], note_urls=[], pages_loaded=0, rate_limited=False)
             with self.assertRaises(CollectionLogError):
-                record_batch(root, "星巴克", batch=2, queries_done=[], note_urls=[], pages_loaded=6, rate_limited=False)
-            with self.assertRaises(CollectionLogError):
-                record_batch(root, "星巴克", batch=2, queries_done=[], note_urls=[], pages_loaded=4, rate_limited=False)
-            with self.assertRaises(CollectionLogError):
                 record_batch(root, "星巴克", batch=2, queries_done=[], queries_limited=["星巴克 自习"],
                              note_urls=[], pages_loaded=1, rate_limited=False)
+            with self.assertRaises(CollectionLogError):
+                record_batch(root, "星巴克", batch=2, queries_done=["星巴克 自习"], queries_limited=["星巴克 自习"],
+                             note_urls=[], pages_loaded=1, rate_limited=True)
+            with self.assertRaises(CollectionLogError):
+                record_batch(root, "星巴克", batch=2, queries_done=[], note_urls=[], pages_loaded=-1, rate_limited=False)
+
+    def test_over_budget_batch_is_kept_flagged_and_lengthens_cooldown(self):
+        with tempfile.TemporaryDirectory() as root:
+            ended = datetime(2026, 9, 27, 12, 0, 0)
+            s = record_batch(root, "星巴克", batch=1, queries_done=["星巴克 自习"], note_urls=[URL],
+                             pages_loaded=6, rate_limited=False, now=ended)
+            self.assertTrue(s["batches"][-1]["over_budget"])
+            self.assertEqual(s["batches"][-1]["page_budget"], 5)
+            self.assertEqual(s["pages_per_batch"], 3)  # recovery-sized next batch
+            self.assertFalse(status(root, "星巴克", now=ended + timedelta(minutes=30))["collection_allowed"])
+            self.assertTrue(status(root, "星巴克", now=ended + timedelta(minutes=91))["collection_allowed"])
 
     def test_successful_batch_has_short_cooldown_and_marks_query_done(self):
         with tempfile.TemporaryDirectory() as root:
@@ -77,6 +89,14 @@ class CollectionLogTests(unittest.TestCase):
             self.assertEqual([b["batch"] for b in snap["batches"]], [1, 2])
             self.assertEqual(len(list_snapshots(data / "evidence", "珀莱雅")), 1)
             self.assertEqual(status(data / "collection", "珀莱雅")["next_batch"], 3)
+
+            before = (data / "evidence").joinpath(f"{first['snapshot_id']}.json").read_text(encoding="utf-8")
+            log_before = (data / "collection" / "珀莱雅.json").read_text(encoding="utf-8")
+            for bad in ({"batch": 2}, {"batch": 3, "queries_done": ["a"], "queries_limited": ["a"], "rate_limited": True}):
+                with self.assertRaises(CollectionLogError):
+                    save_evidence("珀莱雅", raw, data, pages=1, **bad)
+            self.assertEqual((data / "evidence").joinpath(f"{first['snapshot_id']}.json").read_text(encoding="utf-8"), before)
+            self.assertEqual((data / "collection" / "珀莱雅.json").read_text(encoding="utf-8"), log_before)
 
             ev = first["usable_evidence"][0]["evidence_id"]
             coding = {"open_codes": [{"code_id": "OC-001", "label": "白天用会不会搓泥", "in_vivo": True,

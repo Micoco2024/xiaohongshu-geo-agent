@@ -31,7 +31,7 @@ sys.path.insert(0, str(SKILL_ROOT.parent / "xiaohongshu-geo-evaluator" / "tools"
 from brand_discovery import normalize_discovery_result  # noqa: E402
 from evaluator import run_deterministic_evaluation  # noqa: E402
 from live_test import record_runs, start_session  # noqa: E402
-from collection_log import plan_queries, record_batch, status as collection_status  # noqa: E402
+from collection_log import check_batch, plan_queries, record_batch, status as collection_status  # noqa: E402
 from evidence_store import append_batch, brand_key, list_snapshots, load_snapshot, save_snapshot  # noqa: E402
 from grounded_coding import check_bank_against_coding, saturation, validate_coding  # noqa: E402
 from question_bank import validate_question_bank  # noqa: E402
@@ -55,6 +55,11 @@ def save_evidence(
     working snapshot and record the batch in the collection log."""
     raw = json.loads(raw_path.read_text(encoding="utf-8"))
     discovery = normalize_discovery_result(brand, raw)
+    if batch is not None:
+        # Validate the batch before writing anything, so a rejected batch
+        # leaves both the snapshot and the collection log untouched.
+        check_batch(data_root / "collection", brand, batch=batch, queries_done=queries_done or [],
+                    pages_loaded=pages, rate_limited=rate_limited, queries_limited=queries_limited or [])
     if batch is None:
         summary = save_snapshot(data_root / "evidence", brand, discovery, model=RUNTIME_LABEL)
     else:
@@ -65,7 +70,9 @@ def save_evidence(
             note_urls=[r["source_ref"] for r in discovery["evidence"]],
             pages_loaded=pages, rate_limited=rate_limited,
         )
-        summary["collection"] = {k: log[k] for k in ("next_batch", "seen_notes", "planned_queries")}
+        summary["collection"] = {k: log[k] for k in ("next_batch", "seen_notes", "planned_queries",
+                                                      "collection_allowed", "resume_after", "pages_per_batch")}
+        summary["collection"]["this_batch"] = log["batches"][-1]
     return {
         **summary,
         "coverage_note": discovery["coverage_note"],

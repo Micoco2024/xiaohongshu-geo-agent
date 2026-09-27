@@ -58,12 +58,16 @@ Sort by 最新 as well as 综合 when the filter is available: the default order
 
 - One normal batch = at most `pages_per_batch` page loads (currently 5; see
   `collect-status`), counting discovery result pages and opened Xiaohongshu
-  notes. A recovery batch after a rate limit is capped at 3 pages.
+  notes. A recovery batch after a rate limit or an over-budget batch is capped
+  at 3 pages.
+- Report the pages actually loaded, even when over budget. The batch is still
+  saved, flagged `over_budget`, and the next cooldown is the long one. Never
+  under-report pages to fit the budget.
 - Wait at least 10 seconds between Xiaohongshu page loads. Do not open notes in
   parallel. Reading and expanding comments on the current page does not consume
   another page load.
-- After a normal batch, wait at least 20 minutes. After a rate limit, wait at
-  least 90 minutes. `collect-status` is authoritative for `resume_after`.
+- After a normal batch, wait at least 20 minutes. After a rate limit or an
+  over-budget batch, wait at least 90 minutes. `collect-status` is authoritative for `resume_after`.
 - Skip notes already in `seen_note_ids` from `collect-status`.
 - Code the batch before collecting the next one. Coding is also the natural pause for the site.
 - Signs of rate limiting: search submits but the result list does not change,
