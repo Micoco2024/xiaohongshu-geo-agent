@@ -1,124 +1,114 @@
-# Research method
+# Research method: grounded theory
 
-Use this reference for scene discovery, qualitative coding, question-path construction, and intent inference.
+Use this reference for coding, category building, scene and intent formation, and question construction.
 
 ## Method position
 
-Use a grounded-theory-inspired abductive thematic analysis. Do not describe the work as full grounded theory unless the project actually performs theoretical sampling, constant comparison, memoing, negative-case analysis, researcher review, and an explicit saturation assessment.
+The agent uses constructivist grounded theory (Charmaz) with the Strauss–Corbin coding paradigm for axial coding. Data collection and analysis alternate: each batch of notes is coded before the next batch is chosen, and what to collect next is decided by gaps in the emerging categories (theoretical sampling), not by a fixed keyword list. Collection stops at theoretical saturation, not at a fixed note count.
 
-The analysis chain is:
+Honesty rules:
+
+- Call the result "grounded-theory coding of N notes and M comments collected in K batches". Do not claim platform-wide findings.
+- An automated run has no second human coder. Say so in the coverage note; do not report inter-coder agreement.
+- Keep the analysis traceable: every open code cites evidence IDs, every higher level lists the codes it is built from. `tools/grounded_coding.py` enforces this.
 
 ```text
-source evidence
-→ meaning units
-→ first-order codes
-→ second-order themes
-→ scenes
-→ explicit questions and decision stages
-→ question paths
-→ latent intents
+batch of notes and comments
+→ open (initial) coding, line by line
+→ focused coding (the most frequent / most explanatory initial codes)
+→ axial coding: categories with properties, dimensions and the paradigm
+     conditions · context · actions/interactions · consequences
+→ memos after every batch
+→ theoretical sampling: the next queries target the thinnest part of a category
+→ repeat until saturation
+→ selective coding: one core category that ties the categories together
+→ scenes (from conditions + context) and intents (from actions + consequences)
 → GEO questions
 ```
 
-## Units and definitions
+## 1. Open coding
 
-### Meaning unit
+Code each meaning unit (a sentence or clause in a note, comment or reply that expresses a need, action, judgment, worry or outcome).
 
-The smallest excerpt that independently expresses a need, concern, experience, judgment, action, or expected result. Preserve its evidence ID and local context.
+- Write codes as actions or processes in the user's terms: “赶早八前找地方坐一会儿”, not “场景” or “学生”. Nouns alone are not codes.
+- Use in-vivo codes (the user's exact words, in quotation marks, `in_vivo: true`) when the phrasing itself carries meaning, e.g. “续杯到底能不能续”.
+- Code comments and replies as carefully as the note body. On mature brands the note body is often promotional while the comments hold the real questions.
+- Mark promotional, official, templated or duplicated sources in the evidence record; code them, but they cannot on their own support a category.
+- Record `batch` on every code.
 
-### Scene
+## 2. Focused coding
 
-A concrete situation combining as many of the following as the evidence supports:
+After each batch, compare open codes across authors, dates and queries. Group those that express the same process under a focused code. Choose focused codes for analytic power, not frequency alone: a code seen twice that explains many others can outrank one seen ten times.
 
-```text
-user + task + trigger + context + constraint + decision stage
-```
+A focused code backed by one piece of evidence is provisional; the validator warns about it.
 
-Do not promote broad topics such as “sunscreen,” “travel,” or “mother and baby” to scenes.
+## 3. Axial coding: categories
 
-### Question path
+A category is a phenomenon users deal with, e.g. “在固定预算里把会员权益用足”. For each category record:
 
-A sequence of questions serving one decision process, commonly moving through:
+- **Properties and dimensions**: what varies and between which ends, e.g. 规则清晰度：从完全不懂到熟练; 时间压力：从随意到赶时间. Properties are where later batches add detail; record `batch` on each.
+- **Paradigm**, each part listing focused codes:
+  - `conditions` — what triggers the phenomenon (causal conditions);
+  - `context` — where, when, with whom, under which constraints;
+  - `actions` — what users do or ask to handle it (strategies, interactions);
+  - `consequences` — what they hope for or what happens (outcomes, including emotional and social).
+- **Negative cases**: evidence that contradicts the category. Keep it; it sharpens properties and prevents forcing.
 
-```text
-need recognition
-→ solution exploration
-→ category choice
-→ brand comparison
-→ risk validation
-→ purchase decision
-→ usage optimization
-→ after-sales resolution
-```
+An empty paradigm part is the most important output of a batch: it is the next sampling target.
 
-Use `observed_session` internally only when same-user or same-thread evidence establishes sequence. Otherwise use `inferred_pathway` internally and never claim it represents a real individual's complete journey.
+## 4. Memos
 
-### Intent
+Write at least one memo per batch. A memo records a comparison, why codes were merged or split, a hunch about how categories relate, or a negative case and what it changes. Memos are how the analysis shows its reasoning; they cite code or category IDs in `about`.
 
-The progress the user is trying to make. Express it through supported elements:
+## 5. Theoretical sampling and saturation
 
-```text
-trigger
-+ desired progress
-+ obstacle or uncertainty
-+ decision criteria
-+ risk to avoid
-+ functional/emotional/social outcome
-+ expected next action
-```
+After coding a batch:
 
-One scene may contain multiple intents, and one intent may span related scenes.
+1. List the gaps: categories with empty paradigm parts, thin properties, provisional focused codes, negative cases not yet explained.
+2. Turn each gap into one or two queries and add them to the collection plan with `purpose: "theoretical"` and the gap as `reason` (see `references/sampling.md`).
+3. Collect the next batch from those queries first.
 
-## Coding procedure
+Saturation (computed by `saturation()` in `tools/grounded_coding.py`): the last two batches produced no new focused codes and no new category properties, with at least three batches collected. New open codes that fit existing focused codes do not break saturation. If collection is stopped by rate limits before saturation, say so; do not call the result saturated.
 
-1. Create first-order codes close to the user's language and phrased as needs or actions, such as “avoid discovering incompatibility only after purchase.” Avoid noun-only labels such as “price” or “sensitive skin.”
-2. Compare codes across authors, dates, content types, and queries. Keep meaningful differences in user, task, trigger, constraint, or decision stage.
-3. Group codes into themes describing conditions, actions, and expected outcomes.
-4. Propose a scene only when multiple meaning units form a coherent situation.
-5. Form an intent as the best explanation of the relevant questions and actions, then test at least one alternative explanation when the evidence permits.
-6. Preserve contradictory or negative cases rather than forcing all evidence into the dominant interpretation.
+## 6. Selective coding: the core category
+
+When categories are stable, name one core category that most categories relate to and that explains variation across them. It frames the question bank; it does not itself become a question.
+
+## 7. From categories to scenes and intents
+
+- **Scene** = one category, described through its conditions and context (who, when, where, trigger, constraint). In the question bank, `scene_id` is the `category_id` and `scene` is that description. `save-bank` rejects scene IDs that are not categories of the coding record.
+- **Intent** = the progress users are trying to make in that category, taken from actions and consequences. Record at least one alternative explanation in a memo when the evidence allows.
+- **Question paths** follow the decision stages visible in the actions. Only evidence from one thread (a note and its replies, one customer-service conversation) can show a real sequence; a path assembled across users is an inferred pathway and is labelled as such.
 
 ## Brand-free validation
 
-When data access allows it, remove the target brand from candidate-scene language and inspect category, need, pain-point, and usage content. Use this to distinguish:
+Mature brands dominate their own search results with official and promotional content. Collect brand-free queries for the category's needs (see `references/sampling.md`) and code them in the same way. Use them to separate:
 
 - demand that exists independently of the brand;
-- brand-established associations;
-- unmet or weakly occupied opportunities;
-- risk or misunderstanding patterns;
-- marketing-created associations unsupported by organic discussion.
-
-Brand-free validation is an analytical safeguard, not a requirement to reconstruct Xiaohongshu search ranking.
+- associations the brand already holds;
+- needs the brand has not entered;
+- risks, complaints and misunderstandings;
+- associations created only by marketing, without organic discussion.
 
 ## Evidence handling
 
-For each source retain internally:
-
-- stable evidence ID;
-- Xiaohongshu URL or authorized source identifier;
-- source type;
-- author identifier in minimized or hashed form when needed;
-- publication/capture context when available;
-- exact supporting excerpt;
-- commercial, official, duplicated, templated, or uncertain-content marker.
-
-Use search-result snippets as weaker context when the full Xiaohongshu page is unavailable. Do not treat snippets as complete representations of the source.
+For each source retain: stable evidence ID; Xiaohongshu URL or authorized source identifier; source type (post, comment, reply); author role; capture context; exact excerpt; promotional/official/templated marker where it applies. Search snippets are candidates only and cannot support a code.
 
 ## Acceptance rules
 
-Accept a scene-intent pair for question generation only when:
+Accept a category for question generation only when:
 
-- the evidence supports a concrete scene rather than a topic label;
-- the intent explains the linked questions or actions;
-- the conclusion is not based solely on one promotional source;
-- meaningful counterevidence has been considered;
-- every generated question can cite at least one supporting evidence reference.
+- it is grounded in evidence from more than one author;
+- it does not rest only on promotional or official sources;
+- its paradigm has conditions or context (to form a scene) and actions or consequences (to form an intent);
+- negative cases have been considered in a memo;
+- every question built on it can cite supporting evidence.
 
-Evidence volume thresholds may vary by category. Do not fabricate universal cutoffs or numerical confidence scores.
+Do not invent numeric thresholds or confidence scores.
 
 ## Question construction
 
-Generate only user-plausible questions supported by the scene and intent. Cover relevant types without forcing a fixed ratio:
+Generate only user-plausible questions supported by a category's scene and intent. Cover relevant types without forcing a fixed ratio:
 
 - need and problem recognition;
 - how-to or strategy;
@@ -130,6 +120,6 @@ Generate only user-plausible questions supported by the scene and intent. Cover 
 - usage optimization;
 - after-sales resolution.
 
-Prefer brand-free questions when testing whether an AI system independently surfaces the target brand. Use named-brand questions for comparison, verification, risk, usage, and after-sales intents when supported by evidence.
+Prefer brand-free questions when testing whether an AI system independently surfaces the target brand. Use named-brand questions for comparison, verification, risk, usage and after-sales intents when supported by evidence. Prefer the users' own wording from in-vivo codes.
 
-Natural-language variants must preserve the same scene, intent, and decision stage while varying realistic phrasing. Do not create superficial synonym substitutions that add no testing value.
+Natural-language variants must keep the same scene, intent and decision stage while varying realistic phrasing.

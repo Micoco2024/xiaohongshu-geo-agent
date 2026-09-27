@@ -56,6 +56,64 @@ def save_snapshot(
     return summarize(snapshot)
 
 
+def append_batch(
+    store_root: str | Path,
+    brand_name: str,
+    discovery: dict[str, Any],
+    *,
+    batch: int,
+    model: str | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Merge one collection batch into the brand's working snapshot.
+
+    Collection for large brands runs in several paced batches (search slows
+    down after a burst). All batches share one snapshot id so coding records
+    and question banks keep resolving the same evidence ids.
+    """
+    existing = list_snapshots(store_root, brand_name)
+    if not existing:
+        summary = save_snapshot(store_root, brand_name, discovery, model=model, now=now)
+        snapshot = load_snapshot(store_root, summary["snapshot_id"])
+        snapshot["batches"] = [_batch_entry(batch, discovery["evidence"], now)]
+        _write(store_root, snapshot)
+        return summarize(snapshot)
+
+    snapshot = load_snapshot(store_root, existing[0]["snapshot_id"])
+    old = snapshot["discovery"]
+    known = {record["evidence_id"] for record in old["evidence"]}
+    added = [record for record in discovery["evidence"] if record["evidence_id"] not in known]
+    old["evidence"].extend(added)
+    if old.get("brand_profile") is None and discovery.get("brand_profile") is not None:
+        old["brand_profile"] = discovery["brand_profile"]
+    old["usable_user_evidence_count"] = old.get("usable_user_evidence_count", 0) + sum(
+        1 for r in added
+        if r["status"] == "usable" and r["author_role"] in {"user", "creator", "unknown"}
+        and any(u in r["usage"] for u in ("scene_signal", "intent_signal", "question_expression"))
+    )
+    if old["usable_user_evidence_count"] and old.get("status") == "insufficient":
+        old["status"] = "ready"
+    if discovery.get("coverage_note"):
+        old["coverage_note"] = discovery["coverage_note"]
+    old["missing_information"] = sorted(set(discovery.get("missing_information", [])))
+    snapshot.setdefault("batches", []).append(_batch_entry(batch, added, now))
+    _write(store_root, snapshot)
+    return {**summarize(snapshot), "added": len(added), "duplicates": len(discovery["evidence"]) - len(added)}
+
+
+def _batch_entry(batch: int, records: list[dict[str, Any]], now: datetime | None) -> dict[str, Any]:
+    return {
+        "batch": batch,
+        "added_evidence_ids": [r["evidence_id"] for r in records],
+        "saved_at": (now or datetime.now()).replace(microsecond=0).isoformat(),
+    }
+
+
+def _write(store_root: str | Path, snapshot: dict[str, Any]) -> None:
+    path = Path(store_root) / f"{snapshot['snapshot_id']}.json"
+    path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def load_snapshot(store_root: str | Path, snapshot_id: str) -> dict[str, Any]:
     if not isinstance(snapshot_id, str) or not SNAPSHOT_ID_PATTERN.match(snapshot_id):
         raise EvidenceStoreError("invalid snapshot_id")
@@ -93,4 +151,5 @@ def summarize(snapshot: dict[str, Any]) -> dict[str, Any]:
         "evidence_count": len(evidence),
         "usable_count": sum(1 for item in evidence if item.get("status") == "usable"),
         "usable_user_evidence_count": discovery.get("usable_user_evidence_count", 0),
+        "batches": len(snapshot.get("batches", [])),
     }

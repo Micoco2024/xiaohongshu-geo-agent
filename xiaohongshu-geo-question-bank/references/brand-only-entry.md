@@ -16,6 +16,9 @@ Merchant and customer-service access are optional. When relevant tools exist, in
 
 ## Discovery rules
 
+For query design, reading comment sections, batch size, pacing and rate limits, follow `references/sampling.md`. For large brands do not rely on the bare brand-name search.
+
+
 - Expand the brand into alias, category, product, usage, pain-point, comparison, purchase, comment, and follow-up searches.
 - Use search engines or hosted web search only to discover public Xiaohongshu pages.
 - A directly opened Xiaohongshu page with a preserved excerpt may become usable evidence.

@@ -25,7 +25,8 @@ If the brand name is materially ambiguous, ask only the minimum question needed 
 - Read [references/brand-only-entry.md](references/brand-only-entry.md) when starting from a brand name and performing automatic discovery.
 - Validate the normalized profile with [schemas/brand-profile.schema.json](schemas/brand-profile.schema.json) before starting evidence analysis.
 - Register and validate sources with [schemas/evidence-record.schema.json](schemas/evidence-record.schema.json); use deterministic evidence IDs so repeated runs retain the same references.
-- Read [references/research-method.md](references/research-method.md) when discovering scenes, coding content, reconstructing question paths, or inferring intent.
+- Read [references/sampling.md](references/sampling.md) before collecting evidence and before every batch: where user voices are on mature brands, query design, pacing, rate limits.
+- Read [references/research-method.md](references/research-method.md) before coding: grounded theory (open, focused and axial coding, memos, theoretical sampling, saturation) and how categories become scenes and intents.
 - Read [references/output-schema.md](references/output-schema.md) whenever generating, validating, or exporting the final question bank.
 - Read [references/content-guidance.md](references/content-guidance.md) when insights will guide Xiaohongshu content generation.
 - Validate the final machine-readable deliverable with [schemas/question-bank.schema.json](schemas/question-bank.schema.json) and semantic checks before delivery.
@@ -38,12 +39,12 @@ If the brand name is materially ambiguous, ask only the minimum question needed 
 3. If a connector is unavailable, unsupported, or authorization is declined, continue without repeated prompts. Offer customer-service document upload as the fallback; if no document is supplied, continue with public evidence and report the coverage gap.
 4. Normalize discovered or API-confirmed facts into the shared brand-profile structure. Keep customer-authored service questions in the user-question corpus rather than treating them as brand facts.
 5. Register each usable source with a stable evidence ID. Preserve the public URL or authorized internal source identifier, context, and exact excerpt used.
-6. Split Xiaohongshu titles, posts, comments and replies, plus authorized customer-service question turns, into meaning units. Code user tasks, triggers, contexts, constraints, decision stages, concerns, actions, and desired outcomes.
-7. Build candidate scenes as combinations of user, task, trigger, context, constraint, and decision stage. A topic or keyword alone is not a scene.
-8. Validate candidate scenes with brand-free category, need, pain-point, and usage-language evidence where available. Separate organic demand from official, commercial, duplicated, or templated content.
-9. Map explicit questions to decision stages. Distinguish an observed same-user sequence from a cross-user inferred pathway; never present the latter as one person's actual journey.
-10. Infer the underlying intent that best explains the questions and actions. Record alternative explanations and contradictory evidence before accepting the intent.
-11. Build one validated scene-intent insight core. From it, generate GEO questions, content briefs, or both as requested.
+6. Collect in paced batches (see `references/sampling.md`) and code each batch with grounded theory before collecting the next: open coding line by line, focused coding, axial coding into categories with properties, dimensions and the conditions / context / actions / consequences paradigm, and at least one memo per batch.
+7. Choose the next batch's queries by theoretical sampling: target the thinnest part of the categories. Use brand-free queries to separate demand that exists without the brand from associations the brand created.
+8. Stop at saturation (two batches with no new focused codes or properties), or when the page budget or rate limits end collection; only the first is called saturated.
+9. Name the core category. Turn each accepted category into a scene (conditions + context) and an intent (actions + consequences), with alternative explanations and negative cases recorded in memos.
+10. Distinguish an observed same-thread sequence from a cross-user inferred pathway; never present the latter as one person's actual journey.
+11. From the accepted categories, generate GEO questions, content briefs, or both as requested. Each question's `scene_id` is its category's `category_id`.
 12. Validate each requested output against its schema, remove unsupported or semantically duplicate items, and retain evidence references.
 
 ## Runtimes
@@ -54,16 +55,20 @@ There are two ways to run this agent. Both produce the same files in `../xiaohon
 
 Use this when the agent runs as a skill in Claude Code or Codex. The client does discovery and writing itself, reading Xiaohongshu through the user's own logged-in Chrome (Claude in Chrome for Claude Code, ChatGPT for Chrome for Codex); `tools/local_run.py` does normalization, evidence IDs, validation, the deterministic gates, and storage.
 
-1. **Reuse before searching.** List `../xiaohongshu-geo-workbench/data/evidence/<brand>/`. If a snapshot exists, tell the user its date and evidence counts and reuse it unless they ask for a fresh search. Searching is the expensive step.
-2. **Discover.** Search inside xiaohongshu.com in the user's Chrome, following `references/brand-only-entry.md`. Open each note before citing it. Set `verification` to `opened_page` only when the note was opened and the excerpt appears in it verbatim; otherwise use `search_result_only`. If the browser extension is not connected or the user is not logged in to Xiaohongshu, stop and tell the user which of the two to fix. If a page will not open, keep it as `search_result_only` and do not reconstruct its text from the snippet. Do not attempt to bypass login. Pace reading (a few seconds between notes) and stop when search or pages stop responding; that is rate limiting.
-3. **Save evidence.** Write the result as JSON matching `schemas/brand-discovery.schema.json` to a scratch file, then run
-   `python3 tools/local_run.py save-evidence --brand <brand> --raw <file>`.
-   The output lists the usable evidence IDs; only these may be cited. If `status` is `insufficient` or `ambiguous`, stop and report the coverage note instead of generating questions.
-4. **Generate.** Read `references/research-method.md` and `references/output-schema.md`, then write the question bank as JSON matching `schemas/question-bank.schema.json`, citing only the usable evidence IDs from step 3.
-5. **Validate and save.** Run
+1. **Resume before searching.** Run `python3 tools/local_run.py collect-status --brand <brand>` and list `../xiaohongshu-geo-workbench/data/evidence/<brand>/`. If collection exists, tell the user how many batches and notes it has, whether the last batch was rate-limited and when, and whether coding is saturated; continue from there unless they ask to start over.
+2. **Plan.** Write seed, brand-free and comparison queries (see `references/sampling.md`; never start with the bare brand name for a large brand) and add them with `collect-plan`.
+3. **Collect one batch.** In the user's Chrome, run planned queries and open notes, at most `pages_per_batch` page loads, skipping `seen_note_ids`. Read comment sections and replies, not only note bodies. Set `verification` to `opened_page` only when the note was opened and the excerpt appears in it verbatim; otherwise `search_result_only`, and never rebuild text from a snippet. If the extension is not connected or the user is not logged in to Xiaohongshu, stop and say which to fix. Never bypass login or verification.
+4. **Save the batch.** Write it as JSON matching `schemas/brand-discovery.schema.json` and run
+   `python3 tools/local_run.py save-evidence --brand <brand> --raw <file> --batch <n> --pages <n> --queries-done "<q1>,<q2>" [--rate-limited]`.
+   It merges into the brand's working snapshot and lists usable evidence IDs; only these may be cited. On rate limiting, save, stop collecting, and tell the user when to resume.
+5. **Code the batch.** Following `references/research-method.md`, update the coding record (JSON, shape in `tools/grounded_coding.py`) and run
+   `python3 tools/local_run.py save-coding --brand <brand> --coding <file>`.
+   Read its `warnings` (empty paradigm parts, thin codes), `uncoded_evidence` and `saturation`. Turn the gaps into `theoretical` queries with `collect-plan`, then go back to step 3, unless saturated or the user stops.
+6. **Generate.** Read `references/output-schema.md` and write the question bank from the accepted categories (`scene_id` = `category_id`), citing only usable evidence IDs.
+7. **Validate and save.** Run
    `python3 tools/local_run.py save-bank --snapshot <snapshot_id> --bank <file>`.
-   If it reports an error or any failed check, fix the bank and run it again. Report the release decision and the path of the saved run.
-6. **Live AI test (only when the user asks).** Run
+   It also checks every scene against the coding record. Fix and rerun on any error or failed check. Report the release decision, the saved run path, the number of batches, notes and comments coded, and whether saturation was reached.
+8. **Live AI test (only when the user asks).** Run
    `python3 tools/local_run.py live-plan --run <run_id> --products 点点,豆包 --repeats 1`
    to list what to ask each product. Ask each question in a fresh conversation (for a chain, ask the turns in order in one conversation), capture the full answer and any cited sources verbatim, and save them with
    `python3 tools/local_run.py live-record --run <run_id> --records <file>`.
@@ -71,6 +76,8 @@ Use this when the agent runs as a skill in Claude Code or Codex. The client does
    Brand mention is detected automatically; record `recommended` or `compared` only when the answer clearly does so, and leave accuracy and intent as `review` unless checked against the evidence. Pace browser use and stop if a product blocks or rate-limits the account. Live results are reported separately and never change the question-bank release decision.
 
 ### B. Claude API (web workbench)
+
+This runtime makes one discovery call and one generation call; it does not run batched collection or the grounded-theory coding loop. Use runtime A when analysis quality matters.
 
 With `ANTHROPIC_API_KEY` and the `anthropic` Python SDK, `tools/agent_runner.py` runs discovery (`tools/brand_discovery.py`) and generation (`tools/generation_agent.py`) through `tools/claude_client.py` with structured outputs, then the local semantic validator. It owns automatic discovery, the evidence sufficiency gate, optional merchant-fact enrichment, and final question-bank generation. Keep API credentials in the server environment; never place them in prompts, source files, or deliverables.
 
