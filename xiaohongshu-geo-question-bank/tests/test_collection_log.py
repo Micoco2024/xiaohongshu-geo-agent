@@ -2,6 +2,7 @@ import json
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta
 from pathlib import Path
 
 
@@ -25,14 +26,43 @@ class CollectionLogTests(unittest.TestCase):
                                           {"query": "星巴克 星星 兑换", "purpose": "theoretical", "reason": "CAT-001 缺结果"}])
             with self.assertRaises(CollectionLogError):
                 plan_queries(root, "星巴克", [{"query": "x", "purpose": "theoretical"}])
-            s = record_batch(root, "星巴克", batch=1, queries_done=["星巴克 自习"], note_urls=[URL, URL + "?x=1"],
-                             pages_loaded=8, rate_limited=True)
+            ended = datetime(2026, 9, 27, 12, 0, 0)
+            s = record_batch(root, "星巴克", batch=1, queries_done=[], queries_limited=["星巴克 自习"],
+                             note_urls=[URL, URL + "?x=1"], pages_loaded=3, rate_limited=True, now=ended)
             self.assertEqual(s["next_batch"], 2)
             self.assertEqual(s["seen_notes"], 1)
-            self.assertEqual([q["query"] for q in s["planned_queries"]], ["星巴克 星星 兑换"])
+            self.assertEqual([q["query"] for q in s["planned_queries"]], ["星巴克 自习", "星巴克 星星 兑换"])
+            self.assertEqual(s["planned_queries"][0]["attempt_count"], 1)
+            self.assertEqual(s["planned_queries"][0]["last_attempt"]["outcome"], "rate_limited")
             self.assertEqual(s["last_rate_limited_batch"], 1)
+            self.assertFalse(s["collection_allowed"])
+            self.assertEqual(s["pages_per_batch"], 3)
+            self.assertEqual(s["recommended_discovery_mode"], "external_index_first")
+            resumed = status(root, "星巴克", now=ended + timedelta(minutes=91))
+            self.assertTrue(resumed["collection_allowed"])
             with self.assertRaises(CollectionLogError):
                 record_batch(root, "星巴克", batch=1, queries_done=[], note_urls=[], pages_loaded=0, rate_limited=False)
+            with self.assertRaises(CollectionLogError):
+                record_batch(root, "星巴克", batch=2, queries_done=[], note_urls=[], pages_loaded=6, rate_limited=False)
+            with self.assertRaises(CollectionLogError):
+                record_batch(root, "星巴克", batch=2, queries_done=[], note_urls=[], pages_loaded=4, rate_limited=False)
+            with self.assertRaises(CollectionLogError):
+                record_batch(root, "星巴克", batch=2, queries_done=[], queries_limited=["星巴克 自习"],
+                             note_urls=[], pages_loaded=1, rate_limited=False)
+
+    def test_successful_batch_has_short_cooldown_and_marks_query_done(self):
+        with tempfile.TemporaryDirectory() as root:
+            plan_queries(root, "星巴克", [{"query": "星巴克 自习", "purpose": "seed"}])
+            ended = datetime(2026, 9, 27, 12, 0, 0)
+            record_batch(root, "星巴克", batch=1, queries_done=["星巴克 自习"], note_urls=[URL],
+                         pages_loaded=2, rate_limited=False, now=ended)
+            cooling = status(root, "星巴克", now=ended + timedelta(minutes=10))
+            self.assertFalse(cooling["collection_allowed"])
+            self.assertEqual(cooling["wait_seconds"], 600)
+            ready = status(root, "星巴克", now=ended + timedelta(minutes=21))
+            self.assertTrue(ready["collection_allowed"])
+            self.assertEqual(ready["pages_per_batch"], 5)
+            self.assertEqual(ready["done_queries"], 1)
 
     def test_batches_merge_into_one_snapshot_and_coding_is_checked(self):
         with tempfile.TemporaryDirectory() as tmp:

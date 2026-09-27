@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -18,9 +18,10 @@ from evidence_store import brand_key
 
 
 PURPOSES = ("seed", "theoretical", "brand_free", "comparison")
-# Pages opened per batch before pausing. Chosen from observed slow-downs after
-# roughly 15 page loads in a burst; kept below that on purpose.
-PAGES_PER_BATCH = 10
+PAGES_PER_BATCH = 5
+RECOVERY_PAGES_PER_BATCH = 3
+NORMAL_COOLDOWN_MINUTES = 20
+RATE_LIMIT_COOLDOWN_MINUTES = 90
 
 
 class CollectionLogError(ValueError):
@@ -60,8 +61,15 @@ def plan_queries(root: str | Path, brand: str, queries: list[dict[str, Any]]) ->
             raise CollectionLogError(f"{query}: theoretical sampling needs the category gap it targets")
         if query in known:
             continue
-        log["queries"].append({"query": query, "purpose": purpose, "reason": item.get("reason") or "",
-                               "status": "planned", "batch": None})
+        log["queries"].append({
+            "query": query,
+            "purpose": purpose,
+            "reason": item.get("reason") or "",
+            "status": "planned",
+            "batch": None,
+            "attempt_count": 0,
+            "last_attempt": None,
+        })
         known.add(query)
     _save(root, log)
     return status(root, brand)
@@ -76,18 +84,53 @@ def record_batch(
     note_urls: Iterable[str],
     pages_loaded: int,
     rate_limited: bool,
+    queries_limited: Iterable[str] = (),
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     log = load_log(root, brand)
     if any(b["batch"] == batch for b in log["batches"]):
         raise CollectionLogError(f"batch {batch} already recorded")
+    recovery = bool(log["batches"] and log["batches"][-1]["rate_limited"])
+    page_limit = RECOVERY_PAGES_PER_BATCH if recovery else PAGES_PER_BATCH
+    if not isinstance(pages_loaded, int) or not 0 <= pages_loaded <= page_limit:
+        raise CollectionLogError(f"pages_loaded must be between 0 and {page_limit}")
+    ended = (now or datetime.now()).replace(microsecond=0)
     done = set(q.strip() for q in queries_done if q and q.strip())
+    limited = set(q.strip() for q in queries_limited if q and q.strip())
+    if done & limited:
+        raise CollectionLogError("a query cannot be both done and rate-limited")
+    if limited and not rate_limited:
+        raise CollectionLogError("queries_limited requires rate_limited=True")
+    attempted = done | limited
     for q in log["queries"]:
+        q.setdefault("attempt_count", 0)
+        q.setdefault("last_attempt", None)
+        if q["query"] in attempted:
+            q["attempt_count"] += 1
+            q["last_attempt"] = {
+                "batch": batch,
+                "outcome": "done" if q["query"] in done else "rate_limited",
+                "at": ended.isoformat(),
+            }
         if q["query"] in done and q["status"] != "done":
             q["status"] = "done"
             q["batch"] = batch
-    unknown = done - {q["query"] for q in log["queries"]}
+    unknown = attempted - {q["query"] for q in log["queries"]}
     for query in sorted(unknown):
-        log["queries"].append({"query": query, "purpose": "seed", "reason": "", "status": "done", "batch": batch})
+        is_done = query in done
+        log["queries"].append({
+            "query": query,
+            "purpose": "seed",
+            "reason": "",
+            "status": "done" if is_done else "planned",
+            "batch": batch if is_done else None,
+            "attempt_count": 1,
+            "last_attempt": {
+                "batch": batch,
+                "outcome": "done" if is_done else "rate_limited",
+                "at": ended.isoformat(),
+            },
+        })
     seen = set(log["seen_notes"])
     new_notes = []
     for n in (note_id(u) for u in note_urls):
@@ -100,21 +143,46 @@ def record_batch(
         "pages_loaded": pages_loaded,
         "new_notes": len(new_notes),
         "rate_limited": rate_limited,
-        "ended_at": datetime.now().replace(microsecond=0).isoformat(),
+        "ended_at": ended.isoformat(),
     })
     _save(root, log)
-    return status(root, brand)
+    return status(root, brand, now=ended)
 
 
-def status(root: str | Path, brand: str) -> dict[str, Any]:
+def status(root: str | Path, brand: str, *, now: datetime | None = None) -> dict[str, Any]:
     log = load_log(root, brand)
     batches = log["batches"]
+    current = (now or datetime.now()).replace(microsecond=0)
+    last_batch = batches[-1] if batches else None
     last_limited = next((b for b in reversed(batches) if b["rate_limited"]), None)
+    cooldown_minutes = RATE_LIMIT_COOLDOWN_MINUTES if last_batch and last_batch["rate_limited"] else NORMAL_COOLDOWN_MINUTES
+    resume_after = None
+    collection_allowed = True
+    wait_seconds = 0
+    if last_batch:
+        ended = datetime.fromisoformat(last_batch["ended_at"])
+        resume = ended + timedelta(minutes=cooldown_minutes)
+        resume_after = resume.isoformat()
+        wait_seconds = max(0, int((resume - current).total_seconds()))
+        collection_allowed = wait_seconds == 0
+    recovery = bool(last_batch and last_batch["rate_limited"])
+    page_budget = RECOVERY_PAGES_PER_BATCH if recovery else PAGES_PER_BATCH
+    mode = "external_index_first"
+    planned = []
+    for query in log["queries"]:
+        query.setdefault("attempt_count", 0)
+        query.setdefault("last_attempt", None)
+        if query["status"] == "planned":
+            planned.append(query)
     return {
         "brand": log["brand"],
         "next_batch": (max((b["batch"] for b in batches), default=0) + 1),
-        "pages_per_batch": PAGES_PER_BATCH,
-        "planned_queries": [q for q in log["queries"] if q["status"] == "planned"],
+        "collection_allowed": collection_allowed,
+        "resume_after": resume_after,
+        "wait_seconds": wait_seconds,
+        "pages_per_batch": page_budget,
+        "recommended_discovery_mode": mode,
+        "planned_queries": planned,
         "done_queries": sum(1 for q in log["queries"] if q["status"] == "done"),
         "seen_notes": len(log["seen_notes"]),
         "seen_note_ids": log["seen_notes"],

@@ -7,7 +7,8 @@ folder, so the web workbench can display runs made here.
 
   python3 tools/local_run.py collect-status --brand 珀莱雅
   python3 tools/local_run.py collect-plan --brand 珀莱雅 --queries queries.json
-  python3 tools/local_run.py save-evidence --brand 珀莱雅 --raw batch1.json --batch 1 --pages 9 --queries-done "珀莱雅 早C晚A,珀莱雅 敏感肌" [--rate-limited]
+  python3 tools/local_run.py save-evidence --brand 珀莱雅 --raw batch1.json --batch 1 --pages 5 --queries-done "珀莱雅 早C晚A"
+  python3 tools/local_run.py save-evidence --brand 珀莱雅 --raw limited.json --batch 2 --pages 1 --queries-limited "珀莱雅 敏感肌" --rate-limited
   python3 tools/local_run.py save-coding --brand 珀莱雅 --coding coding.json
   python3 tools/local_run.py save-bank --snapshot 珀莱雅/20260926-110005 --bank bank.json
   python3 tools/local_run.py live-plan --run 珀莱雅/20260926-111200 --products 点点,豆包 --repeats 1
@@ -47,6 +48,7 @@ def save_evidence(
     batch: int | None = None,
     pages: int = 0,
     queries_done: list[str] | None = None,
+    queries_limited: list[str] | None = None,
     rate_limited: bool = False,
 ) -> dict[str, Any]:
     """Without --batch: a new snapshot. With --batch: merge into the brand's
@@ -59,6 +61,7 @@ def save_evidence(
         summary = append_batch(data_root / "evidence", brand, discovery, batch=batch, model=RUNTIME_LABEL)
         log = record_batch(
             data_root / "collection", brand, batch=batch, queries_done=queries_done or [],
+            queries_limited=queries_limited or [],
             note_urls=[r["source_ref"] for r in discovery["evidence"]],
             pages_loaded=pages, rate_limited=rate_limited,
         )
@@ -175,7 +178,8 @@ def main() -> None:
     cplan.add_argument("--queries", type=Path, required=True, help='JSON list of {"query", "purpose", "reason"}')
     evidence.add_argument("--batch", type=int, help="merge into the working snapshot as this batch number")
     evidence.add_argument("--pages", type=int, default=0, help="pages opened in this batch")
-    evidence.add_argument("--queries-done", default="", help="comma-separated queries searched in this batch")
+    evidence.add_argument("--queries-done", default="", help="comma-separated queries that returned a usable result page")
+    evidence.add_argument("--queries-limited", default="", help="comma-separated queries stopped by a blank, stale, or verification page")
     evidence.add_argument("--rate-limited", action="store_true", help="search or pages stopped responding")
     coding = commands.add_parser("save-coding", help="validate and store the grounded-theory coding record")
     coding.add_argument("--brand", required=True)
@@ -202,6 +206,7 @@ def main() -> None:
             result = save_evidence(
                 args.brand, args.raw, args.data, batch=args.batch, pages=args.pages,
                 queries_done=[q for q in args.queries_done.replace("，", ",").split(",") if q.strip()],
+                queries_limited=[q for q in args.queries_limited.replace("，", ",").split(",") if q.strip()],
                 rate_limited=args.rate_limited,
             )
         elif args.command == "save-bank":
