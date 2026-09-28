@@ -91,8 +91,10 @@ def append_batch(
         if r["status"] == "usable" and r["author_role"] in {"user", "creator", "unknown"}
         and any(u in r["usage"] for u in ("scene_signal", "intent_signal", "question_expression"))
     )
-    if old["usable_user_evidence_count"] and old.get("status") == "insufficient":
+    if old["usable_user_evidence_count"] and old.get("status") in {"insufficient", "ambiguous"}:
         old["status"] = "ready"
+    elif old.get("status") == "ambiguous" and discovery.get("status") == "insufficient":
+        old["status"] = "insufficient"
     if discovery.get("coverage_note"):
         old["coverage_note"] = discovery["coverage_note"]
     old["missing_information"] = sorted(set(discovery.get("missing_information", [])))

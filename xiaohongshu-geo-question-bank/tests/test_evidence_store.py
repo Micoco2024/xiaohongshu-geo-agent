@@ -10,6 +10,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 from evidence_store import (  # noqa: E402
     EvidenceStoreError,
+    append_batch,
     brand_key,
     list_snapshots,
     load_snapshot,
@@ -57,6 +58,30 @@ class EvidenceStoreTests(unittest.TestCase):
         self.assertEqual(brand_key("Olay / 玉兰油"), "olay_玉兰油")
         with self.assertRaises(EvidenceStoreError):
             brand_key("  ")
+
+    def test_later_batch_resolves_ambiguous_snapshot(self):
+        with tempfile.TemporaryDirectory() as root:
+            ambiguous = {
+                "status": "ambiguous",
+                "brand_profile": None,
+                "evidence": [],
+                "coverage_note": "未消歧",
+                "missing_information": ["品牌主体"],
+                "usable_user_evidence_count": 0,
+            }
+            save_snapshot(root, "Wonder Wander", ambiguous, now=datetime(2026, 9, 27, 22, 10, 9))
+            resolved = {
+                **DISCOVERY,
+                "evidence": [{
+                    "evidence_id": "e3",
+                    "status": "usable",
+                    "author_role": "creator",
+                    "usage": ["scene_signal"],
+                }],
+            }
+            summary = append_batch(root, "Wonder Wander", resolved, batch=2)
+            self.assertEqual(summary["status"], "ready")
+            self.assertEqual(summary["usable_user_evidence_count"], 1)
 
 
 if __name__ == "__main__":
